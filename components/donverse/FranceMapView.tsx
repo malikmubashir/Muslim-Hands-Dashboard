@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.heat';
 import { MapPin, RotateCcw } from 'lucide-react';
 import { DonverseData } from './types';
 import { DonCard, SectionTitle } from './DonCard';
@@ -14,16 +15,42 @@ import {
 const fmtMetric = (v: number, m: MetricKey): string =>
   m === 'amount' ? fmtEur(v) : m === 'avg' ? fmtEur2(v) : fmtNum(v);
 
+// Green intensity gradient for the postcode heat layer (matches brand).
+const HEAT_GRADIENT: Record<number, string> = {
+  0.2: '#c7e9c0',
+  0.5: '#74c476',
+  0.8: '#238b45',
+  1.0: '#00441b',
+};
+
+// Per-postcode value for the active metric.
+const postcodeWeight = (
+  metric: MetricKey,
+  tx: { value: number; count: number } | undefined,
+  dn: { count: number; active: number } | undefined,
+): number => {
+  switch (metric) {
+    case 'amount': return tx?.value ?? 0;
+    case 'count': return tx?.count ?? 0;
+    case 'avg': return tx && tx.count ? tx.value / tx.count : 0;
+    case 'donors': return dn?.count ?? 0;
+    case 'active': return dn?.active ?? 0;
+  }
+};
+
 export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
   const [gran, setGran] = useState<Granularity>('dept');
   const [metric, setMetric] = useState<MetricKey>('amount');
-  const [geo, setGeo] = useState<Record<Granularity, any>>({ dept: null, region: null });
+  const [geo, setGeo] = useState<Record<Granularity, any>>({ dept: null, region: null, postcode: null });
   const [hovered, setHovered] = useState<AreaRow | null>(null);
   const [selected, setSelected] = useState<AreaRow | null>(null);
+  // Lazily-loaded postcode -> [lat, lng] centroid map.
+  const [centroids, setCentroids] = useState<Record<string, [number, number]> | null>(null);
 
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
+  const heatLayerRef = useRef<L.HeatLayer | null>(null);
   const fittedRef = useRef<Granularity | null>(null);
 
   // Consolidated area index for the current granularity.
@@ -40,9 +67,9 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
     gran === 'dept' ? String(f.properties.code) : String(f.properties.nom);
   const featureName = (f: any): string => String(f.properties.nom);
 
-  // ---- Load geojson on demand ----
+  // ---- Load geojson on demand (dept/region only; postcode uses centroids) ----
   useEffect(() => {
-    if (geo[gran]) return;
+    if (gran === 'postcode' || geo[gran]) return;
     const file = gran === 'dept' ? 'geo/departements.geojson' : 'geo/regions.geojson';
     let cancelled = false;
     fetch(file)
@@ -51,6 +78,17 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
       .catch((e) => console.error('geojson load failed', e));
     return () => { cancelled = true; };
   }, [gran, geo]);
+
+  // ---- Lazily load postcode centroids once when entering postcode mode ----
+  useEffect(() => {
+    if (gran !== 'postcode' || centroids) return;
+    let cancelled = false;
+    fetch('geo/postcodes-fr.json')
+      .then((r) => r.json())
+      .then((json) => { if (!cancelled) setCentroids(json as Record<string, [number, number]>); })
+      .catch((e) => console.error('postcode centroids load failed', e));
+    return () => { cancelled = true; };
+  }, [gran, centroids]);
 
   // ---- Init map once (guard against StrictMode double-init) ----
   useEffect(() => {
@@ -76,8 +114,16 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
   // ---- (Re)build the choropleth layer when geo / granularity / metric change ----
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
+
+    // In postcode (heatmap) mode there is no choropleth — tear it down if present.
+    if (gran === 'postcode') {
+      if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
+      return;
+    }
+
     const json = geo[gran];
-    if (!map || !json) return;
+    if (!json) return;
 
     if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
 
@@ -129,6 +175,66 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
     }
   }, [geo, gran, metric, areaIndex, breaks]);
 
+  // ---- Postcode source rows: merge tx + donors keyed by postcode ----
+  const postcodeRows = useMemo(() => {
+    const txMap = new Map<string, { value: number; count: number }>();
+    for (const t of data.tx.byPostcode ?? []) txMap.set(t.postcode, { value: t.value, count: t.count });
+    const dnMap = new Map<string, { count: number; active: number; ltv: number }>();
+    for (const d of data.donors.byPostcode ?? []) dnMap.set(d.postcode, { count: d.count, active: d.active, ltv: d.ltv });
+    const keys = new Set<string>([...txMap.keys(), ...dnMap.keys()]);
+    return Array.from(keys).map((postcode) => {
+      const tx = txMap.get(postcode);
+      const dn = dnMap.get(postcode);
+      return { postcode, tx, dn, weight: postcodeWeight(metric, tx, dn) };
+    });
+  }, [data, metric]);
+
+  // ---- Heat points [lat, lng, weight] for postcodes that have a centroid ----
+  const heatPoints = useMemo(() => {
+    if (!centroids) return [] as L.HeatLatLngTuple[];
+    const pts: L.HeatLatLngTuple[] = [];
+    for (const r of postcodeRows) {
+      if (r.weight <= 0) continue;
+      const c = centroids[r.postcode];
+      if (!c) continue;
+      pts.push([c[0], c[1], r.weight]);
+    }
+    return pts;
+  }, [postcodeRows, centroids]);
+
+  // ---- (Re)build the heat layer in postcode mode ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Leaving postcode mode: drop the heat layer.
+    if (gran !== 'postcode') {
+      if (heatLayerRef.current) { heatLayerRef.current.remove(); heatLayerRef.current = null; }
+      return;
+    }
+
+    // Remove any prior heat layer before rebuilding (metric change / point change).
+    if (heatLayerRef.current) { heatLayerRef.current.remove(); heatLayerRef.current = null; }
+    if (heatPoints.length === 0) return;
+
+    const maxWeight = heatPoints.reduce((m, p) => Math.max(m, p[2] ?? 0), 0) || 1;
+    const heat = L.heatLayer(heatPoints, {
+      max: maxWeight,
+      radius: 22,
+      blur: 18,
+      minOpacity: 0.25,
+      gradient: HEAT_GRADIENT,
+    });
+    heat.addTo(map);
+    heatLayerRef.current = heat;
+
+    map.invalidateSize();
+    if (fittedRef.current !== 'postcode') {
+      map.setView([46.6, 2.3], 6);
+      fittedRef.current = 'postcode';
+    }
+  }, [gran, heatPoints]);
+
   // ---- Top 10 ranking for the current metric (polygon areas only: exclude DOM codes) ----
   const domCodes = new Set(DOM.map((d) => d.code));
   const top10 = useMemo(() => {
@@ -140,6 +246,14 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
       .slice(0, 10);
     return rows;
   }, [areaIndex, metric, gran]);
+
+  // Top 10 postcodes for the current metric (postcode mode).
+  const top10Postcodes = useMemo(() => {
+    return postcodeRows
+      .filter((r) => r.weight > 0)
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 10);
+  }, [postcodeRows]);
 
   // Legend ranges from quantile breaks.
   const legendRows = useMemo(() => {
@@ -167,15 +281,15 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
-          {(['dept', 'region'] as Granularity[]).map((g) => (
+          {(['region', 'dept', 'postcode'] as Granularity[]).map((g) => (
             <button
               key={g}
-              onClick={() => { setGran(g); setSelected(null); }}
+              onClick={() => { setGran(g); setSelected(null); setHovered(null); }}
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                 gran === g ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {g === 'dept' ? 'Départements' : 'Régions'}
+              {g === 'dept' ? 'Départements' : g === 'region' ? 'Régions' : 'Code postal (carte de chaleur)'}
             </button>
           ))}
         </div>
@@ -213,18 +327,35 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
           {/* Legend */}
           <DonCard>
             <SectionTitle sub={metricLabel}>Légende</SectionTitle>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {legendRows.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                  <span className="inline-block w-4 h-4 rounded" style={{ background: r.color }} />
-                  {r.label}
+            {gran === 'postcode' ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-xs text-gray-600">
+                  <span>faible</span>
+                  <span
+                    className="inline-block h-3 flex-1 rounded"
+                    style={{ background: 'linear-gradient(to right, #c7e9c0, #74c476, #238b45, #00441b)' }}
+                  />
+                  <span>élevé</span>
                 </div>
-              ))}
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <span className="inline-block w-4 h-4 rounded" style={{ background: NO_DATA }} />
-                Aucune donnée
+                <p className="text-xs text-gray-500">
+                  Carte de chaleur par code postal · les zones de moins de{' '}
+                  {data.meta.suppressMinDonors ?? 5} donateurs sont masquées.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {legendRows.map((r, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="inline-block w-4 h-4 rounded" style={{ background: r.color }} />
+                    {r.label}
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="inline-block w-4 h-4 rounded" style={{ background: NO_DATA }} />
+                  Aucune donnée
+                </div>
+              </div>
+            )}
           </DonCard>
         </div>
 
@@ -255,18 +386,28 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
           {/* Top 10 ranking */}
           <DonCard>
             <SectionTitle sub={metricLabel}>
-              {gran === 'dept' ? 'Top 10 départements' : 'Top 10 régions'}
+              {gran === 'dept' ? 'Top 10 départements' : gran === 'region' ? 'Top 10 régions' : 'Top 10 codes postaux'}
             </SectionTitle>
             <ol className="space-y-1.5">
-              {top10.map((x, i) => (
-                <li key={x.row.key} className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
-                    <span className="truncate text-gray-700">{x.row.name}</span>
-                  </span>
-                  <span className="font-semibold text-gray-900 tabular-nums">{fmtMetric(x.v, metric)}</span>
-                </li>
-              ))}
+              {gran === 'postcode'
+                ? top10Postcodes.map((x, i) => (
+                    <li key={x.postcode} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
+                        <span className="truncate text-gray-700">{x.postcode}</span>
+                      </span>
+                      <span className="font-semibold text-gray-900 tabular-nums">{fmtMetric(x.weight, metric)}</span>
+                    </li>
+                  ))
+                : top10.map((x, i) => (
+                    <li key={x.row.key} className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
+                        <span className="truncate text-gray-700">{x.row.name}</span>
+                      </span>
+                      <span className="font-semibold text-gray-900 tabular-nums">{fmtMetric(x.v, metric)}</span>
+                    </li>
+                  ))}
             </ol>
           </DonCard>
 

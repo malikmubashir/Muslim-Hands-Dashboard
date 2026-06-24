@@ -1,6 +1,6 @@
 import { DonverseData } from './types';
 
-export type Granularity = 'dept' | 'region';
+export type Granularity = 'dept' | 'region' | 'postcode';
 export type MetricKey = 'amount' | 'count' | 'avg' | 'donors' | 'active';
 
 export const METRICS: { key: MetricKey; label: string }[] = [
