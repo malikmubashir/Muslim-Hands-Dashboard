@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 dist-electron
+
+# Raw N3O CRM exports (PII) — never commit. Keep the folder via .gitkeep.
+data-source/*.xlsx
+data-source/*.xls
+data-source/*.csv

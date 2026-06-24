@@ -9,6 +9,8 @@
   "author": "Muslim Hands",
   "scripts": {
     "dev": "vite",
+    "refresh": "node scripts/aggregate-donverse.mjs",
+    "refresh:build": "npm run refresh && npm run build",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",

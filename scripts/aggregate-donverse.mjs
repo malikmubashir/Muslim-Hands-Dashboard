@@ -1,18 +1,124 @@
 // Anonymized DONVERSE aggregation pipeline.
-// Reads two PII CRM exports from ~/Documents/GitHub/_mhf_source and writes a
-// fully anonymized aggregate at public/data/donverse.json (zero personal data).
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+// Locates two PII CRM exports (filename-agnostic, auto-detected by content) and
+// writes a fully anonymized aggregate at public/data/donverse.json (zero PII).
+//
+// Source directory is resolved in priority order:
+//   (a) CLI arg `process.argv[2]` if given
+//   (b) ./data-source in the project root, if it exists and has .xlsx files
+//   (c) ~/Documents/GitHub/_mhf_source  (legacy fallback)
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import * as XLSX from 'xlsx';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
-const SRC = resolve(homedir(), 'Documents/GitHub/_mhf_source');
-const TX_FILE = 'DASHBOARD DATA - 2025.xlsx';
-const DONOR_FILE = 'Liste donateurs global.xlsx';
 const OUT = resolve(REPO, 'public/data/donverse.json');
+
+// ---- Resolve source directory ----
+function listXlsx(dir) {
+  try {
+    return readdirSync(dir)
+      .filter((f) => /\.xlsx$/i.test(f) && !f.startsWith('~$'))
+      .map((f) => resolve(dir, f));
+  } catch {
+    return [];
+  }
+}
+
+function resolveSourceDir() {
+  const argDir = process.argv[2];
+  if (argDir) {
+    const d = resolve(argDir);
+    if (!existsSync(d)) {
+      console.error(`ERROR: source directory passed as argument does not exist: ${d}`);
+      process.exit(1);
+    }
+    return d;
+  }
+  const dataSource = resolve(REPO, 'data-source');
+  if (existsSync(dataSource) && listXlsx(dataSource).length > 0) return dataSource;
+  return resolve(homedir(), 'Documents/GitHub/_mhf_source');
+}
+
+const SRC = resolveSourceDir();
+console.log('Source directory:', SRC);
+
+// ---- Auto-detection by signature columns ----
+// Read just the header row of a workbook to classify it.
+function readHeaders(file) {
+  try {
+    const wb = XLSX.read(readFileSync(file), { sheetRows: 1, dense: true });
+    const headers = new Set();
+    for (const sn of wb.SheetNames) {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: null, raw: true });
+      if (rows && rows[0]) for (const h of rows[0]) if (h != null) headers.add(String(h).trim());
+    }
+    return headers;
+  } catch (e) {
+    return new Set();
+  }
+}
+
+const has = (set, ...cols) => cols.every((c) => set.has(c));
+const hasAny = (set, ...cols) => cols.some((c) => set.has(c));
+
+// TRANSACTIONS signature: giving/transactions export.
+function isTransactions(h) {
+  return has(h, 'Donation Amount (Base)', 'Fund Dimension 2', 'Postal Code');
+}
+// DONORS signature: donor profiles export.
+function isDonors(h) {
+  return has(h, 'Total Donation Amount', 'Maximum Donation Date') && hasAny(h, 'RGPD POST IN', 'Reference');
+}
+
+function detectSources() {
+  const candidates = listXlsx(SRC);
+  if (candidates.length === 0) {
+    console.error(`ERROR: no .xlsx files found in source directory: ${SRC}`);
+    console.error('Drop your two N3O exports (transactions + donors) there and retry.');
+    process.exit(1);
+  }
+  const txMatches = [];
+  const donorMatches = [];
+  for (const file of candidates) {
+    const h = readHeaders(file);
+    if (isTransactions(h)) txMatches.push(file);
+    if (isDonors(h)) donorMatches.push(file);
+  }
+  // Most-recently-modified wins when multiple files match a role.
+  const newest = (arr) =>
+    arr.slice().sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+
+  const errs = [];
+  if (txMatches.length === 0) {
+    errs.push('TRANSACTIONS file NOT found. Expected signature columns: "Donation Amount (Base)" AND "Fund Dimension 2" AND "Postal Code".');
+  }
+  if (donorMatches.length === 0) {
+    errs.push('DONORS file NOT found. Expected signature columns: "Total Donation Amount" AND "Maximum Donation Date" AND ("RGPD POST IN" OR "Reference").');
+  }
+  if (errs.length) {
+    console.error('\nERROR: could not auto-detect both source files.');
+    console.error('Files scanned in', SRC + ':');
+    for (const f of candidates) console.error('  -', basename(f));
+    console.error('');
+    for (const e of errs) console.error('  ' + e);
+    process.exit(1);
+  }
+  const txFile = newest(txMatches);
+  const donorFile = newest(donorMatches);
+  if (txFile === donorFile) {
+    console.error(`ERROR: the same file (${basename(txFile)}) matched BOTH roles. Provide two distinct exports.`);
+    process.exit(1);
+  }
+  const stamp = (f) => new Date(statSync(f).mtime).toISOString().slice(0, 16).replace('T', ' ');
+  console.log(`Detected TRANSACTIONS file: ${basename(txFile)}  (modified ${stamp(txFile)})`);
+  console.log(`Detected DONORS file:       ${basename(donorFile)}  (modified ${stamp(donorFile)})`);
+  return { txFile, donorFile };
+}
+
+const { txFile: TX_FILE, donorFile: DONOR_FILE } = detectSources();
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -115,16 +221,16 @@ function addSlice(map, key, value, extra) {
 function sortDesc(arr) { return arr.sort((a, b) => b.value - a.value); }
 
 function readSheet(file, sheetHint) {
-  const buf = readFileSync(resolve(SRC, file));
+  const buf = readFileSync(file);
   const wb = XLSX.read(buf, { cellDates: true, dense: true });
   const sn = wb.SheetNames.find(s => s.toLowerCase().includes(sheetHint.toLowerCase())) || wb.SheetNames[0];
   return XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: null, raw: true });
 }
 
-console.log('Reading transactions:', TX_FILE);
+console.log('Reading transactions:', basename(TX_FILE));
 const txData = readSheet(TX_FILE, 'dashboard');
 console.log('  tx rows:', txData.length);
-console.log('Reading donors:', DONOR_FILE);
+console.log('Reading donors:', basename(DONOR_FILE));
 const donorData = readSheet(DONOR_FILE, 'donateurs');
 console.log('  donor rows:', donorData.length);
 
@@ -256,7 +362,7 @@ const dByRegionArr = [...dByRegion.entries()].map(([name, e]) => ({ name, count:
 const output = {
   meta: {
     generatedAt: new Date().toISOString(),
-    sources: [TX_FILE, DONOR_FILE],
+    sources: [basename(TX_FILE), basename(DONOR_FILE)],
     currency: 'EUR',
     txRows: txData.length,
     txTotalBase: round2(txTotalBase),
