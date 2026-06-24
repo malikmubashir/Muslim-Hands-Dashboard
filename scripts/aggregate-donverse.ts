@@ -20,7 +20,10 @@ import { aggregateDonverseWithExtras } from '../lib/aggregateDonverse';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(__dirname, '..');
-const OUT = resolve(REPO, 'public/data/donverse.json');
+// Seed dataset now lives server-side (api/_data), NOT under public/, so the
+// production data is never served as a static file. The serverless /api/data
+// function bundles + serves this seed when no upload exists yet.
+const OUT = resolve(REPO, 'api/_data/seed-donverse.json');
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 

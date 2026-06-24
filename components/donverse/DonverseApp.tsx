@@ -1,9 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Map as MapIcon, Users, Heart, Loader2, AlertTriangle, LucideIcon } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  LayoutDashboard, Map as MapIcon, Users, Heart, Loader2, AlertTriangle,
+  RefreshCw, LogOut, CheckCircle2, LucideIcon,
+} from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
+import PasswordGate from './PasswordGate';
+import UpdateDataModal from './UpdateDataModal';
+import {
+  DEV_BYPASS, getStoredPassword, clearStoredPassword, loadDataset, LoadedDataset,
+} from '../../services/donverseClient';
 
 const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
   { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -12,21 +20,65 @@ const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
 ];
 
 const DonverseApp: React.FC = () => {
+  // In dev we bypass the gate; in prod the gate is required unless a password
+  // is already stored for this session.
+  const [unlocked, setUnlocked] = useState<boolean>(DEV_BYPASS || !!getStoredPassword());
   const [data, setData] = useState<DonverseData | null>(null);
+  const [meta, setMeta] = useState<{ source: LoadedDataset['source']; lastUpdated: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<DonverseView>('overview');
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    setError(null);
+    setData(null);
+    loadDataset()
+      .then((res) => {
+        setData(res.data);
+        setMeta({ source: res.source, lastUpdated: res.lastUpdated });
+      })
+      .catch((e: any) => {
+        if (e?.code === 401) {
+          // Session password no longer valid → re-show the gate.
+          clearStoredPassword();
+          setUnlocked(false);
+        } else {
+          setError(String(e?.message || e));
+        }
+      });
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch('data/donverse.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((json: DonverseData) => { if (!cancelled) setData(json); })
-      .catch((e) => { if (!cancelled) setError(String(e?.message || e)); });
-    return () => { cancelled = true; };
-  }, []);
+    if (unlocked) load();
+  }, [unlocked, load]);
+
+  const onUpdated = useCallback(() => {
+    setShowUpdate(false);
+    setToast('Données mises à jour.');
+    load();
+    setTimeout(() => setToast(null), 3500);
+  }, [load]);
+
+  const logout = () => {
+    clearStoredPassword();
+    setUnlocked(false);
+    setData(null);
+    setMeta(null);
+  };
+
+  if (!unlocked) {
+    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  }
+
+  // Friendly data-source label.
+  const dataLabel = (() => {
+    if (!meta) return 'Données 2025 · anonymisées';
+    const d = meta.lastUpdated ? new Date(meta.lastUpdated) : null;
+    const when = d && !isNaN(d.getTime()) ? d.toLocaleDateString('fr-FR') : '';
+    if (meta.source === 'uploaded') return `Données : mises à jour le ${when}`;
+    return `Données de référence (2025)${when ? ' · ' + when : ''}`;
+  })();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -42,9 +94,27 @@ const DonverseApp: React.FC = () => {
               <p className="text-emerald-100 text-sm">Console de Pilotage — Muslim Hands France</p>
             </div>
           </div>
-          <span className="self-start sm:self-auto text-xs font-medium bg-white/15 rounded-full px-3 py-1">
-            Données 2025 · anonymisées
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-xs font-medium bg-white/15 rounded-full px-3 py-1">
+              {dataLabel}
+            </span>
+            <button
+              onClick={() => setShowUpdate(true)}
+              className="flex items-center gap-1.5 text-xs font-medium bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors"
+            >
+              <RefreshCw size={14} />
+              Mettre à jour
+            </button>
+            {!DEV_BYPASS && (
+              <button
+                onClick={logout}
+                title="Se déconnecter"
+                className="flex items-center gap-1.5 text-xs font-medium bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors"
+              >
+                <LogOut size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Tabs */}
@@ -105,6 +175,17 @@ const DonverseApp: React.FC = () => {
           </p>
         )}
       </footer>
+
+      {showUpdate && (
+        <UpdateDataModal onClose={() => setShowUpdate(false)} onUpdated={onUpdated} />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-emerald-600 text-white text-sm font-medium rounded-full px-4 py-2 shadow-lg">
+          <CheckCircle2 size={16} />
+          {toast}
+        </div>
+      )}
     </div>
   );
 };
