@@ -9,6 +9,11 @@ export interface DonorNameRow { name: string; count: number; }
 export interface DonorDeptRow { code: string; count: number; active: number; ltv: number; }
 export interface DonorRegionRow { name: string; count: number; active: number; ltv: number; }
 
+// Postcode-level aggregates (for heatmaps). Small-cell suppressed in the
+// published output; residual rolled into the *PostcodeSuppressed buckets.
+export interface TxPostcodeRow { postcode: string; value: number; count: number; }
+export interface DonorPostcodeRow { postcode: string; count: number; active: number; ltv: number; }
+
 export interface DonverseData {
   meta: {
     generatedAt: string;
@@ -20,6 +25,9 @@ export interface DonverseData {
     monthMin: string;
     monthMax: string;
     note?: string;
+    // Postcode small-cell suppression (Phase 7a).
+    suppressMinDonors?: number;
+    postcodesSuppressed?: number; // # of postcodes omitted from published output
   };
   tx: {
     byDept: TxDeptRow[];
@@ -30,6 +38,8 @@ export interface DonverseData {
     byDestination: TxAmountRow[];
     byMonth: TxMonthRow[];
     byCountry: TxAmountRow[];
+    byPostcode?: TxPostcodeRow[];
+    postcodeSuppressed?: { count: number; value: number };
   };
   donors: {
     total: number;
@@ -40,6 +50,8 @@ export interface DonverseData {
     byConsent: DonorNameRow[];
     byDept: DonorDeptRow[];
     byRegion: DonorRegionRow[];
+    byPostcode?: DonorPostcodeRow[];
+    postcodeSuppressed?: { count: number };
   };
 }
 
