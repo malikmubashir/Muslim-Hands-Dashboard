@@ -1,17 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  LayoutDashboard, Map as MapIcon, Users, Heart, Loader2, AlertTriangle,
-  RefreshCw, LogOut, CheckCircle2, LucideIcon,
+  LayoutDashboard, Map as MapIcon, Users, Loader2, AlertTriangle,
+  RefreshCw, CheckCircle2, LucideIcon,
 } from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
-import PasswordGate from './PasswordGate';
 import UpdateDataModal from './UpdateDataModal';
-import {
-  DEV_BYPASS, getStoredPassword, clearStoredPassword, loadDataset, LoadedDataset,
-} from '../../services/donverseClient';
+import { loadDataset, LoadedDataset } from '../../services/donverseClient';
 
 const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
   { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -20,9 +17,6 @@ const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
 ];
 
 const DonverseApp: React.FC = () => {
-  // In dev we bypass the gate; in prod the gate is required unless a password
-  // is already stored for this session.
-  const [unlocked, setUnlocked] = useState<boolean>(DEV_BYPASS || !!getStoredPassword());
   const [data, setData] = useState<DonverseData | null>(null);
   const [meta, setMeta] = useState<{ source: LoadedDataset['source']; lastUpdated: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,19 +33,13 @@ const DonverseApp: React.FC = () => {
         setMeta({ source: res.source, lastUpdated: res.lastUpdated });
       })
       .catch((e: any) => {
-        if (e?.code === 401) {
-          // Session password no longer valid → re-show the gate.
-          clearStoredPassword();
-          setUnlocked(false);
-        } else {
-          setError(String(e?.message || e));
-        }
+        setError(String(e?.message || e));
       });
   }, []);
 
   useEffect(() => {
-    if (unlocked) load();
-  }, [unlocked, load]);
+    load();
+  }, [load]);
 
   const onUpdated = useCallback(() => {
     setShowUpdate(false);
@@ -59,17 +47,6 @@ const DonverseApp: React.FC = () => {
     load();
     setTimeout(() => setToast(null), 3500);
   }, [load]);
-
-  const logout = () => {
-    clearStoredPassword();
-    setUnlocked(false);
-    setData(null);
-    setMeta(null);
-  };
-
-  if (!unlocked) {
-    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
-  }
 
   // Friendly data-source label.
   const dataLabel = (() => {
@@ -83,37 +60,33 @@ const DonverseApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-gradient-to-r from-emerald-800 to-emerald-600 text-white shadow">
+      <header
+        className="text-white shadow"
+        style={{ backgroundImage: 'linear-gradient(to right, #28B8D8, #1C8099)' }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-lg bg-white/15 flex items-center justify-center">
-              <Heart size={24} />
-            </div>
+            <img
+              src="/brand/mhf-mark-white.png"
+              alt="Muslim Hands France"
+              className="h-10 w-10"
+            />
             <div>
-              <h1 className="text-xl font-bold leading-tight tracking-tight">MH DONVERSE</h1>
-              <p className="text-emerald-100 text-sm">Console de Pilotage — Muslim Hands France</p>
+              <h1 className="text-xl font-bold leading-tight tracking-tight text-white">MH DONVERSE</h1>
+              <p className="text-white/80 text-sm">Console de Pilotage — Muslim Hands France</p>
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <span className="text-xs font-medium bg-white/15 rounded-full px-3 py-1">
+            <span className="text-xs font-medium text-white bg-white/20 rounded-full px-3 py-1">
               {dataLabel}
             </span>
             <button
               onClick={() => setShowUpdate(true)}
-              className="flex items-center gap-1.5 text-xs font-medium bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors"
             >
               <RefreshCw size={14} />
               Mettre à jour
             </button>
-            {!DEV_BYPASS && (
-              <button
-                onClick={logout}
-                title="Se déconnecter"
-                className="flex items-center gap-1.5 text-xs font-medium bg-white/15 hover:bg-white/25 rounded-full px-3 py-1.5 transition-colors"
-              >
-                <LogOut size={14} />
-              </button>
-            )}
           </div>
         </div>
 
@@ -130,7 +103,7 @@ const DonverseApp: React.FC = () => {
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     active
                       ? 'border-white text-white'
-                      : 'border-transparent text-emerald-100 hover:text-white hover:border-white/40'
+                      : 'border-transparent text-white/75 hover:text-white hover:border-white/40'
                   }`}
                 >
                   <Icon size={16} />
@@ -167,7 +140,8 @@ const DonverseApp: React.FC = () => {
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 text-xs text-gray-400">
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 flex items-center gap-4 text-xs text-gray-400">
+        <img src="/brand/mhf-logo.png" className="h-8" alt="Muslim Hands France" />
         {data && (
           <p>
             Source : {data.meta.sources.join(', ')} · Généré le{' '}

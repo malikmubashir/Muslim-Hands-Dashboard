@@ -29,3 +29,4 @@ dist-electron
 data-source/*.xlsx
 data-source/*.xls
 data-source/*.csv
+.vercel

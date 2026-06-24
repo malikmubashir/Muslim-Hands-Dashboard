@@ -1,15 +1,16 @@
 // /api/data — read & write the shared DONVERSE dataset (anonymized only).
 //
-// GET  : requires a valid team password header. Returns the latest dataset.
-//        If a blob `donverse-latest.json` exists, fetch + return it (source
-//        "uploaded"); otherwise return the bundled seed (source "seed").
-//        Response carries `x-data-source` + `x-data-updated` headers AND the
-//        same info inside the JSON envelope (source / lastUpdated).
+// OPEN ACCESS: no password. Both methods are unauthenticated.
 //
-// POST : requires a valid team password header. Body = an already-aggregated,
-//        anonymized DonverseData JSON (produced client-side by the browser —
-//        raw PII never reaches this endpoint). We validate minimally then
-//        overwrite the blob deterministically (addRandomSuffix:false).
+// GET  : Returns the latest dataset. If a blob `donverse-latest.json` exists,
+//        fetch + return it (source "uploaded"); otherwise return the bundled
+//        seed (source "seed"). Response carries `x-data-source` +
+//        `x-data-updated` headers AND the same info inside the JSON envelope.
+//
+// POST : Body = an already-aggregated, anonymized DonverseData JSON (produced
+//        client-side by the browser — raw PII never reaches this endpoint). We
+//        validate minimally then overwrite the blob deterministically
+//        (addRandomSuffix:false).
 //
 // Storage: Vercel Blob. Requires env `BLOB_READ_WRITE_TOKEN` (auto-provided on
 // Vercel once a Blob store is linked to the project).
@@ -17,7 +18,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { put, list } from '@vercel/blob';
-import { isAuthorized } from './_auth';
 
 const BLOB_KEY = 'donverse-latest.json';
 
@@ -55,11 +55,6 @@ function looksLikeDonverseData(d: any): boolean {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Both methods require the team password.
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ ok: false, error: 'Mot de passe incorrect.' });
-  }
-
   // ---------------------------------------------------------------- GET ----
   if (req.method === 'GET') {
     const latest = await findLatestBlob();

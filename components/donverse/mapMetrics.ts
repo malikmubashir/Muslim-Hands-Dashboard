@@ -79,9 +79,9 @@ export function quantileBreaks(values: number[], buckets = 5): number[] {
   return breaks;
 }
 
-// Light -> dark green ramp (index 0 = lowest non-zero bucket).
-export const GREEN_RAMP = ['#d3f9d8', '#8ce99a', '#51cf66', '#2f9e44', '#0b5a0b'];
-export const NO_DATA = '#eef1f4';
+// Light -> dark turquoise ramp (index 0 = lowest non-zero bucket).
+export const GREEN_RAMP = ['#C8F1F8', '#9FE7F1', '#45C9DF', '#28B8D8', '#1C8099'];
+export const NO_DATA = '#E5E7EB';
 
 // Returns a fill color for a value given the quantile breaks.
 export function colorFor(value: number, breaks: number[]): string {

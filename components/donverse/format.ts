@@ -1,4 +1,4 @@
-// Shared FR formatters + Muslim Hands green theme for DONVERSE
+// Shared FR formatters + Muslim Hands France turquoise theme for DONVERSE
 
 const eur = new Intl.NumberFormat('fr-FR', {
   style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
@@ -21,18 +21,18 @@ export const fmtEurShort = (v: number) => {
   return `${Math.round(n)} €`;
 };
 
-// Muslim Hands green palette
+// Muslim Hands France turquoise palette (keys kept for backwards compat)
 export const MH = {
-  green: '#107c10',
-  greenDark: '#0b5a0b',
-  greenMid: '#2f9e44',
-  greenLight: '#69db7c',
-  emerald: '#10b981',
+  green: '#28B8D8',      // brand 500 — primary bar/area fill
+  greenDark: '#1C8099',  // brand 700 — emphasis
+  greenMid: '#45C9DF',   // brand 400 — secondary
+  greenLight: '#9FE7F1', // brand 200 — light tint
+  emerald: '#28B8D8',    // brand 500
 };
 
-// Categorical palette (green-led, with supporting hues for pies)
+// Categorical palette (turquoise-led, with supporting hues for pies)
 export const PALETTE = [
-  '#107c10', '#2f9e44', '#40c057', '#69db7c', '#0ca678',
+  '#28B8D8', '#1C8099', '#6FD9E9', '#1B6878', '#9FE7F1',
   '#1098ad', '#4263eb', '#7048e8', '#e8590c', '#f08c00',
   '#c2255c', '#868e96',
 ];

@@ -15,12 +15,12 @@ import {
 const fmtMetric = (v: number, m: MetricKey): string =>
   m === 'amount' ? fmtEur(v) : m === 'avg' ? fmtEur2(v) : fmtNum(v);
 
-// Green intensity gradient for the postcode heat layer (matches brand).
+// Turquoise intensity gradient for the postcode heat layer (matches brand).
 const HEAT_GRADIENT: Record<number, string> = {
-  0.2: '#c7e9c0',
-  0.5: '#74c476',
-  0.8: '#238b45',
-  1.0: '#00441b',
+  0.2: '#C8F1F8',
+  0.5: '#6FD9E9',
+  0.8: '#28B8D8',
+  1.0: '#15677A',
 };
 
 // Per-postcode value for the active metric.
@@ -152,7 +152,7 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
         );
         lyr.on({
           mouseover: (e) => {
-            (e.target as L.Path).setStyle({ weight: 2.5, color: '#0b5a0b', fillOpacity: 0.95 });
+            (e.target as L.Path).setStyle({ weight: 2.5, color: '#15677A', fillOpacity: 0.95 });
             (e.target as any).bringToFront?.();
             setHovered(display);
           },
@@ -333,7 +333,7 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
                   <span>faible</span>
                   <span
                     className="inline-block h-3 flex-1 rounded"
-                    style={{ background: 'linear-gradient(to right, #c7e9c0, #74c476, #238b45, #00441b)' }}
+                    style={{ background: 'linear-gradient(to right, #C8F1F8, #6FD9E9, #28B8D8, #15677A)' }}
                   />
                   <span>élevé</span>
                 </div>
