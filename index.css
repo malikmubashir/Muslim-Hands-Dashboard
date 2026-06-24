@@ -2,21 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-    font-family: 'Jameel Noori Nastaleeq';
-    src: url('https://raw.githubusercontent.com/urdu-font/Jameel-Noori-Nastaleeq/master/Jameel%20Noori%20Nastaleeq.ttf') format('truetype');
-    font-weight: normal;
-    font-style: normal;
-    font-display: swap;
-}
-
+/* DONVERSE is French-only; the Urdu webfont (previously fetched from a raw
+   GitHub URL on every load) was removed to avoid a slow external dependency.
+   .font-urdu falls back to system fonts for the legacy App.tsx only. */
 body {
     font-family: 'Inter', sans-serif;
     background-color: #f9fafb;
 }
 
 .font-urdu {
-    font-family: 'Jameel Noori Nastaleeq', 'Inter', sans-serif;
+    font-family: 'Noto Nastaliq Urdu', 'Inter', sans-serif;
     line-height: 2;
 }
 
