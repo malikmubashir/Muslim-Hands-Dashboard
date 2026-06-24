@@ -24,6 +24,7 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
+  const fittedRef = useRef<Granularity | null>(null);
 
   // Consolidated area index for the current granularity.
   const areaIndex = useMemo(() => buildAreaIndex(data, gran), [data, gran]);
@@ -65,6 +66,10 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
       maxZoom: 19,
     }).addTo(map);
     mapRef.current = map;
+    // The container often lacks its final size on first paint (tab layout / fonts),
+    // which makes Leaflet fall back to a world view. Recompute once laid out.
+    setTimeout(() => map.invalidateSize(), 0);
+    setTimeout(() => map.invalidateSize(), 250);
     return () => { map.remove(); mapRef.current = null; layerRef.current = null; };
   }, []);
 
@@ -115,6 +120,13 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
     });
     layer.addTo(map);
     layerRef.current = layer;
+    // Ensure correct sizing, then frame metropolitan France once per granularity
+    // (don't re-fit on every metric change — that would yank the user's zoom).
+    map.invalidateSize();
+    if (fittedRef.current !== gran) {
+      try { map.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch { /* noop */ }
+      fittedRef.current = gran;
+    }
   }, [geo, gran, metric, areaIndex, breaks]);
 
   // ---- Top 10 ranking for the current metric (polygon areas only: exclude DOM codes) ----
