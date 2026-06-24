@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+    font-family: 'Jameel Noori Nastaleeq';
+    src: url('https://raw.githubusercontent.com/urdu-font/Jameel-Noori-Nastaleeq/master/Jameel%20Noori%20Nastaleeq.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f9fafb;
+}
+
+.font-urdu {
+    font-family: 'Jameel Noori Nastaleeq', 'Inter', sans-serif;
+    line-height: 2;
+}
+
+/* Hide scrollbar for clean UI */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
