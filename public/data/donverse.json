@@ -1,0 +1,1929 @@
+{
+  "meta": {
+    "generatedAt": "2026-06-24T11:19:48.787Z",
+    "sources": [
+      "DASHBOARD DATA - 2025.xlsx",
+      "Liste donateurs global.xlsx"
+    ],
+    "currency": "EUR",
+    "txRows": 160447,
+    "txTotalBase": 12927942.87,
+    "donorRows": 128305,
+    "monthMin": "2024-12",
+    "monthMax": "2025-12",
+    "note": "Region names match regions.geojson `nom` exactly (13 metropolitan regions). DOM departments (971-976) and their regions appear in the data slices for completeness but have NO polygon in the metropolitan france-geojson, so they will not render on the choropleth map."
+  },
+  "tx": {
+    "byDept": [
+      {
+        "code": "01",
+        "value": 75710.39,
+        "count": 1222
+      },
+      {
+        "code": "02",
+        "value": 23173,
+        "count": 141
+      },
+      {
+        "code": "03",
+        "value": 8423.45,
+        "count": 115
+      },
+      {
+        "code": "04",
+        "value": 6160,
+        "count": 117
+      },
+      {
+        "code": "05",
+        "value": 814,
+        "count": 23
+      },
+      {
+        "code": "06",
+        "value": 70495.86,
+        "count": 1629
+      },
+      {
+        "code": "07",
+        "value": 4209.37,
+        "count": 131
+      },
+      {
+        "code": "08",
+        "value": 2570,
+        "count": 68
+      },
+      {
+        "code": "09",
+        "value": 2194,
+        "count": 77
+      },
+      {
+        "code": "10",
+        "value": 25377.64,
+        "count": 621
+      },
+      {
+        "code": "11",
+        "value": 30086,
+        "count": 164
+      },
+      {
+        "code": "12",
+        "value": 12206.24,
+        "count": 154
+      },
+      {
+        "code": "13",
+        "value": 1357743.08,
+        "count": 17244
+      },
+      {
+        "code": "14",
+        "value": 14766.8,
+        "count": 326
+      },
+      {
+        "code": "15",
+        "value": 780,
+        "count": 10
+      },
+      {
+        "code": "16",
+        "value": 26816.09,
+        "count": 227
+      },
+      {
+        "code": "17",
+        "value": 3152,
+        "count": 68
+      },
+      {
+        "code": "18",
+        "value": 9136,
+        "count": 257
+      },
+      {
+        "code": "19",
+        "value": 39148.9,
+        "count": 84
+      },
+      {
+        "code": "21",
+        "value": 59085.74,
+        "count": 906
+      },
+      {
+        "code": "22",
+        "value": 6198.16,
+        "count": 133
+      },
+      {
+        "code": "23",
+        "value": 2349,
+        "count": 46
+      },
+      {
+        "code": "24",
+        "value": 2938,
+        "count": 63
+      },
+      {
+        "code": "25",
+        "value": 75306.9,
+        "count": 1451
+      },
+      {
+        "code": "26",
+        "value": 19186.46,
+        "count": 522
+      },
+      {
+        "code": "27",
+        "value": 25931.46,
+        "count": 381
+      },
+      {
+        "code": "28",
+        "value": 33323.97,
+        "count": 626
+      },
+      {
+        "code": "29",
+        "value": 19863.5,
+        "count": 245
+      },
+      {
+        "code": "2A",
+        "value": 7350.86,
+        "count": 103
+      },
+      {
+        "code": "2B",
+        "value": 4148.81,
+        "count": 71
+      },
+      {
+        "code": "30",
+        "value": 102346.32,
+        "count": 1134
+      },
+      {
+        "code": "31",
+        "value": 259399.77,
+        "count": 2893
+      },
+      {
+        "code": "32",
+        "value": 1274,
+        "count": 18
+      },
+      {
+        "code": "33",
+        "value": 68267.95,
+        "count": 1266
+      },
+      {
+        "code": "34",
+        "value": 84022.27,
+        "count": 1785
+      },
+      {
+        "code": "35",
+        "value": 20078.87,
+        "count": 396
+      },
+      {
+        "code": "36",
+        "value": 5707.14,
+        "count": 98
+      },
+      {
+        "code": "37",
+        "value": 25298.4,
+        "count": 509
+      },
+      {
+        "code": "38",
+        "value": 274039.98,
+        "count": 2564
+      },
+      {
+        "code": "39",
+        "value": 19544,
+        "count": 123
+      },
+      {
+        "code": "40",
+        "value": 2051,
+        "count": 44
+      },
+      {
+        "code": "41",
+        "value": 10832.35,
+        "count": 209
+      },
+      {
+        "code": "42",
+        "value": 83655.08,
+        "count": 1433
+      },
+      {
+        "code": "43",
+        "value": 38635,
+        "count": 152
+      },
+      {
+        "code": "44",
+        "value": 32389.84,
+        "count": 843
+      },
+      {
+        "code": "45",
+        "value": 137769.41,
+        "count": 2724
+      },
+      {
+        "code": "46",
+        "value": 24333,
+        "count": 123
+      },
+      {
+        "code": "47",
+        "value": 8761,
+        "count": 201
+      },
+      {
+        "code": "48",
+        "value": 10,
+        "count": 1
+      },
+      {
+        "code": "49",
+        "value": 19846.79,
+        "count": 372
+      },
+      {
+        "code": "50",
+        "value": 10177.4,
+        "count": 102
+      },
+      {
+        "code": "51",
+        "value": 68569.63,
+        "count": 1146
+      },
+      {
+        "code": "52",
+        "value": 2241,
+        "count": 78
+      },
+      {
+        "code": "53",
+        "value": 1799.29,
+        "count": 30
+      },
+      {
+        "code": "54",
+        "value": 35704.15,
+        "count": 847
+      },
+      {
+        "code": "55",
+        "value": 7022.89,
+        "count": 74
+      },
+      {
+        "code": "56",
+        "value": 5529,
+        "count": 121
+      },
+      {
+        "code": "57",
+        "value": 141072.13,
+        "count": 2144
+      },
+      {
+        "code": "58",
+        "value": 1122.75,
+        "count": 60
+      },
+      {
+        "code": "59",
+        "value": 312337.75,
+        "count": 3827
+      },
+      {
+        "code": "60",
+        "value": 107513.79,
+        "count": 1699
+      },
+      {
+        "code": "61",
+        "value": 5047.65,
+        "count": 177
+      },
+      {
+        "code": "62",
+        "value": 32453.54,
+        "count": 583
+      },
+      {
+        "code": "63",
+        "value": 52350.8,
+        "count": 721
+      },
+      {
+        "code": "64",
+        "value": 16403,
+        "count": 153
+      },
+      {
+        "code": "65",
+        "value": 5137.6,
+        "count": 98
+      },
+      {
+        "code": "66",
+        "value": 10269.56,
+        "count": 270
+      },
+      {
+        "code": "67",
+        "value": 113658.9,
+        "count": 1812
+      },
+      {
+        "code": "68",
+        "value": 71187.26,
+        "count": 1311
+      },
+      {
+        "code": "69",
+        "value": 727797.08,
+        "count": 10221
+      },
+      {
+        "code": "70",
+        "value": 8212,
+        "count": 151
+      },
+      {
+        "code": "71",
+        "value": 28135.41,
+        "count": 529
+      },
+      {
+        "code": "72",
+        "value": 69449,
+        "count": 304
+      },
+      {
+        "code": "73",
+        "value": 32612.32,
+        "count": 435
+      },
+      {
+        "code": "74",
+        "value": 133122.7,
+        "count": 1513
+      },
+      {
+        "code": "75",
+        "value": 1348925.29,
+        "count": 8288
+      },
+      {
+        "code": "76",
+        "value": 94116.53,
+        "count": 1593
+      },
+      {
+        "code": "77",
+        "value": 522466.38,
+        "count": 5965
+      },
+      {
+        "code": "78",
+        "value": 493867.87,
+        "count": 6767
+      },
+      {
+        "code": "79",
+        "value": 3992,
+        "count": 97
+      },
+      {
+        "code": "80",
+        "value": 30806,
+        "count": 565
+      },
+      {
+        "code": "81",
+        "value": 7320.61,
+        "count": 142
+      },
+      {
+        "code": "82",
+        "value": 6709,
+        "count": 182
+      },
+      {
+        "code": "83",
+        "value": 61697.57,
+        "count": 1131
+      },
+      {
+        "code": "84",
+        "value": 79162.92,
+        "count": 861
+      },
+      {
+        "code": "85",
+        "value": 4676,
+        "count": 74
+      },
+      {
+        "code": "86",
+        "value": 10647,
+        "count": 123
+      },
+      {
+        "code": "87",
+        "value": 6160.08,
+        "count": 93
+      },
+      {
+        "code": "88",
+        "value": 6949.49,
+        "count": 252
+      },
+      {
+        "code": "89",
+        "value": 19044.93,
+        "count": 359
+      },
+      {
+        "code": "90",
+        "value": 21823,
+        "count": 241
+      },
+      {
+        "code": "91",
+        "value": 511309.9,
+        "count": 6431
+      },
+      {
+        "code": "92",
+        "value": 767325.55,
+        "count": 9369
+      },
+      {
+        "code": "93",
+        "value": 1277742.82,
+        "count": 17290
+      },
+      {
+        "code": "94",
+        "value": 729362.05,
+        "count": 10098
+      },
+      {
+        "code": "95",
+        "value": 1167683.92,
+        "count": 12006
+      },
+      {
+        "code": "971",
+        "value": 3827,
+        "count": 23
+      },
+      {
+        "code": "972",
+        "value": 892,
+        "count": 16
+      },
+      {
+        "code": "973",
+        "value": 768,
+        "count": 16
+      },
+      {
+        "code": "974",
+        "value": 8216.33,
+        "count": 326
+      },
+      {
+        "code": "976",
+        "value": 4861,
+        "count": 105
+      }
+    ],
+    "byRegion": [
+      {
+        "name": "Île-de-France",
+        "value": 6818683.78,
+        "count": 76214
+      },
+      {
+        "name": "Provence-Alpes-Côte d'Azur",
+        "value": 1576073.43,
+        "count": 21005
+      },
+      {
+        "name": "Auvergne-Rhône-Alpes",
+        "value": 1450522.63,
+        "count": 19039
+      },
+      {
+        "name": "Occitanie",
+        "value": 545308.37,
+        "count": 7041
+      },
+      {
+        "name": "Hauts-de-France",
+        "value": 506284.08,
+        "count": 6815
+      },
+      {
+        "name": "Grand Est",
+        "value": 474353.09,
+        "count": 8353
+      },
+      {
+        "name": "Bourgogne-Franche-Comté",
+        "value": 232274.73,
+        "count": 3820
+      },
+      {
+        "name": "Centre-Val de Loire",
+        "value": 222067.27,
+        "count": 4423
+      },
+      {
+        "name": "Nouvelle-Aquitaine",
+        "value": 190686.02,
+        "count": 2465
+      },
+      {
+        "name": "Normandie",
+        "value": 150039.84,
+        "count": 2579
+      },
+      {
+        "name": "Pays de la Loire",
+        "value": 128160.92,
+        "count": 1623
+      },
+      {
+        "name": "Bretagne",
+        "value": 51669.53,
+        "count": 895
+      },
+      {
+        "name": "Corse",
+        "value": 11499.67,
+        "count": 174
+      },
+      {
+        "name": "La Réunion",
+        "value": 8216.33,
+        "count": 326
+      },
+      {
+        "name": "Mayotte",
+        "value": 4861,
+        "count": 105
+      },
+      {
+        "name": "Guadeloupe",
+        "value": 3827,
+        "count": 23
+      },
+      {
+        "name": "Martinique",
+        "value": 892,
+        "count": 16
+      },
+      {
+        "name": "Guyane",
+        "value": 768,
+        "count": 16
+      }
+    ],
+    "byTheme": [
+      {
+        "name": "Orphelins",
+        "value": 3263295.2,
+        "count": 49537
+      },
+      {
+        "name": "Fonds général",
+        "value": 2812860.95,
+        "count": 28403
+      },
+      {
+        "name": "Aide alimentaire",
+        "value": 2681986.15,
+        "count": 33634
+      },
+      {
+        "name": "Eau potable",
+        "value": 1868490.15,
+        "count": 20815
+      },
+      {
+        "name": "Urgences",
+        "value": 1702823.75,
+        "count": 22741
+      },
+      {
+        "name": "Environnement",
+        "value": 254480.9,
+        "count": 992
+      },
+      {
+        "name": "Generation de revenus",
+        "value": 94137.72,
+        "count": 1420
+      },
+      {
+        "name": "Sante",
+        "value": 83538.14,
+        "count": 887
+      },
+      {
+        "name": "Education",
+        "value": 64380.91,
+        "count": 1520
+      },
+      {
+        "name": "Enfance",
+        "value": 64232,
+        "count": 356
+      },
+      {
+        "name": "Santé",
+        "value": 30021,
+        "count": 120
+      },
+      {
+        "name": "Génération de revenus",
+        "value": 5285,
+        "count": 7
+      },
+      {
+        "name": "Activités génératrices de revenus",
+        "value": 2311,
+        "count": 14
+      },
+      {
+        "name": "aide alimentaire",
+        "value": 100,
+        "count": 1
+      }
+    ],
+    "byStipulation": [
+      {
+        "name": "Sadaqa",
+        "value": 9487365.04,
+        "count": 149858
+      },
+      {
+        "name": "Zakat El Maal",
+        "value": 2512998.33,
+        "count": 6646
+      },
+      {
+        "name": "Don / Sadaqa",
+        "value": 685052.15,
+        "count": 3174
+      },
+      {
+        "name": "Intérêt",
+        "value": 233385.54,
+        "count": 747
+      },
+      {
+        "name": "Intérêts bancaires",
+        "value": 9141.81,
+        "count": 22
+      }
+    ],
+    "byPayment": [
+      {
+        "name": "Card",
+        "value": 7866061.48,
+        "count": 100859,
+        "isPA": false
+      },
+      {
+        "name": "Direct Debit",
+        "value": 2801238.4,
+        "count": 49701,
+        "isPA": true
+      },
+      {
+        "name": "Chèque",
+        "value": 742432.27,
+        "count": 1265,
+        "isPA": false
+      },
+      {
+        "name": "Bank Transfer",
+        "value": 690323.6,
+        "count": 3734,
+        "isPA": false
+      },
+      {
+        "name": "Espèces",
+        "value": 547657.6,
+        "count": 1792,
+        "isPA": false
+      },
+      {
+        "name": "TPE",
+        "value": 234673.73,
+        "count": 1517,
+        "isPA": false
+      },
+      {
+        "name": "HelloAsso",
+        "value": 42639.79,
+        "count": 1565,
+        "isPA": false
+      },
+      {
+        "name": "Multiple",
+        "value": 2800,
+        "count": 10,
+        "isPA": false
+      },
+      {
+        "name": "Historique",
+        "value": 116,
+        "count": 4,
+        "isPA": false
+      }
+    ],
+    "byDestination": [
+      {
+        "name": "Où le plus utile",
+        "value": 7375168.75,
+        "count": 105277
+      },
+      {
+        "name": "Palestine",
+        "value": 1461022.64,
+        "count": 15352
+      },
+      {
+        "name": "Pakistan",
+        "value": 975712.4,
+        "count": 8366
+      },
+      {
+        "name": "Mali",
+        "value": 677464,
+        "count": 7451
+      },
+      {
+        "name": "Selon les besoins des populations",
+        "value": 600863.02,
+        "count": 2055
+      },
+      {
+        "name": "Somalie",
+        "value": 327418.37,
+        "count": 2595
+      },
+      {
+        "name": "Niger",
+        "value": 284959,
+        "count": 4391
+      },
+      {
+        "name": "Liban",
+        "value": 246678.14,
+        "count": 3882
+      },
+      {
+        "name": "Sri Lanka",
+        "value": 245055,
+        "count": 2539
+      },
+      {
+        "name": "Cachemire (Pakistan)",
+        "value": 151944,
+        "count": 1916
+      },
+      {
+        "name": "Mauritanie",
+        "value": 123728,
+        "count": 1871
+      },
+      {
+        "name": "Yemen",
+        "value": 97336.65,
+        "count": 1043
+      },
+      {
+        "name": "Sénégal",
+        "value": 89123,
+        "count": 1316
+      },
+      {
+        "name": "France",
+        "value": 63065.9,
+        "count": 1012
+      },
+      {
+        "name": "Malawi",
+        "value": 53312,
+        "count": 513
+      },
+      {
+        "name": "Zones prioritaires",
+        "value": 52521,
+        "count": 379
+      },
+      {
+        "name": "Cachemire (Inde)",
+        "value": 41716,
+        "count": 209
+      },
+      {
+        "name": "Inde",
+        "value": 21790,
+        "count": 96
+      },
+      {
+        "name": "Gambie",
+        "value": 15270,
+        "count": 66
+      },
+      {
+        "name": "Bangladesh",
+        "value": 11892,
+        "count": 51
+      },
+      {
+        "name": "Afghanistan",
+        "value": 11693,
+        "count": 51
+      },
+      {
+        "name": "Afrique",
+        "value": 180,
+        "count": 12
+      },
+      {
+        "name": "Maroc",
+        "value": 30,
+        "count": 4
+      }
+    ],
+    "byMonth": [
+      {
+        "month": "2024-12",
+        "amount": 41474.86,
+        "count": 222
+      },
+      {
+        "month": "2025-01",
+        "amount": 886268.02,
+        "count": 7380
+      },
+      {
+        "month": "2025-02",
+        "amount": 941973.91,
+        "count": 7446
+      },
+      {
+        "month": "2025-03",
+        "amount": 3988854.84,
+        "count": 71735
+      },
+      {
+        "month": "2025-04",
+        "amount": 696940.02,
+        "count": 6486
+      },
+      {
+        "month": "2025-05",
+        "amount": 1102477.91,
+        "count": 11550
+      },
+      {
+        "month": "2025-06",
+        "amount": 1344794.33,
+        "count": 13746
+      },
+      {
+        "month": "2025-07",
+        "amount": 597625.63,
+        "count": 6736
+      },
+      {
+        "month": "2025-08",
+        "amount": 540871.13,
+        "count": 7273
+      },
+      {
+        "month": "2025-09",
+        "amount": 543368.17,
+        "count": 6748
+      },
+      {
+        "month": "2025-10",
+        "amount": 553908.44,
+        "count": 6622
+      },
+      {
+        "month": "2025-11",
+        "amount": 568580.82,
+        "count": 6945
+      },
+      {
+        "month": "2025-12",
+        "amount": 1120804.79,
+        "count": 7558
+      }
+    ],
+    "byCountry": [
+      {
+        "name": "France",
+        "value": 12405935.63,
+        "count": 156984
+      },
+      {
+        "name": "Non spécifié",
+        "value": 210138.31,
+        "count": 1545
+      },
+      {
+        "name": "Belgique",
+        "value": 117020.26,
+        "count": 525
+      },
+      {
+        "name": "Émirats arabes unis",
+        "value": 66786.75,
+        "count": 189
+      },
+      {
+        "name": "Suisse",
+        "value": 53586.55,
+        "count": 299
+      },
+      {
+        "name": "Allemagne",
+        "value": 24315.03,
+        "count": 116
+      },
+      {
+        "name": "Luxembourg",
+        "value": 10154,
+        "count": 118
+      },
+      {
+        "name": "La Réunion",
+        "value": 5113,
+        "count": 171
+      },
+      {
+        "name": "Pakistan",
+        "value": 5000,
+        "count": 2
+      },
+      {
+        "name": "Mayotte",
+        "value": 3759,
+        "count": 67
+      },
+      {
+        "name": "Guadeloupe",
+        "value": 3527,
+        "count": 13
+      },
+      {
+        "name": "Maroc",
+        "value": 3182,
+        "count": 30
+      },
+      {
+        "name": "Tunisie",
+        "value": 2681,
+        "count": 6
+      },
+      {
+        "name": "Canada",
+        "value": 2626,
+        "count": 44
+      },
+      {
+        "name": "Irlande",
+        "value": 2496,
+        "count": 16
+      },
+      {
+        "name": "Qatar",
+        "value": 2270,
+        "count": 3
+      },
+      {
+        "name": "Espagne",
+        "value": 2183,
+        "count": 58
+      },
+      {
+        "name": "Royaume-Uni",
+        "value": 1964,
+        "count": 70
+      },
+      {
+        "name": "Monaco",
+        "value": 1406.35,
+        "count": 53
+      },
+      {
+        "name": "Pays-Bas",
+        "value": 876,
+        "count": 28
+      },
+      {
+        "name": "Pologne",
+        "value": 624,
+        "count": 4
+      },
+      {
+        "name": "Australie",
+        "value": 380,
+        "count": 4
+      },
+      {
+        "name": "Roumanie",
+        "value": 347,
+        "count": 39
+      },
+      {
+        "name": "Autriche",
+        "value": 279,
+        "count": 2
+      },
+      {
+        "name": "Portugal",
+        "value": 220,
+        "count": 11
+      },
+      {
+        "name": "États-Unis",
+        "value": 214,
+        "count": 5
+      },
+      {
+        "name": "Algérie",
+        "value": 152,
+        "count": 17
+      },
+      {
+        "name": "Italie",
+        "value": 145,
+        "count": 4
+      },
+      {
+        "name": "Finlande",
+        "value": 144,
+        "count": 4
+      },
+      {
+        "name": "Suède",
+        "value": 120,
+        "count": 2
+      },
+      {
+        "name": "Guyane",
+        "value": 110,
+        "count": 4
+      },
+      {
+        "name": "Norvège",
+        "value": 60,
+        "count": 1
+      },
+      {
+        "name": "Sénégal",
+        "value": 55.99,
+        "count": 8
+      },
+      {
+        "name": "Égypte",
+        "value": 40,
+        "count": 2
+      },
+      {
+        "name": "Afghanistan",
+        "value": 20,
+        "count": 1
+      },
+      {
+        "name": "Belize",
+        "value": 7,
+        "count": 1
+      },
+      {
+        "name": "Eswatini",
+        "value": 5,
+        "count": 1
+      }
+    ]
+  },
+  "donors": {
+    "total": 128305,
+    "totalLtv": 68404925.13,
+    "byActivity": [
+      {
+        "name": "Actif (2024+)",
+        "count": 52752
+      },
+      {
+        "name": "Inactif (2021-23)",
+        "count": 51780
+      },
+      {
+        "name": "Oublié (<2021)",
+        "count": 21911
+      },
+      {
+        "name": "Inconnu",
+        "count": 1862
+      }
+    ],
+    "byTier": [
+      {
+        "name": "Kind (<500)",
+        "count": 104258
+      },
+      {
+        "name": "Engaged (500-1.5k)",
+        "count": 13552
+      },
+      {
+        "name": "Generous (1.5-5k)",
+        "count": 8022
+      },
+      {
+        "name": "Major (≥5k)",
+        "count": 2473
+      }
+    ],
+    "byType": [
+      {
+        "name": "Individual",
+        "count": 127607
+      },
+      {
+        "name": "Organization",
+        "count": 698
+      }
+    ],
+    "byConsent": [
+      {
+        "name": "Opt-In",
+        "count": 105291
+      },
+      {
+        "name": "Opt-Out",
+        "count": 11431
+      },
+      {
+        "name": "Non renseigné",
+        "count": 10598
+      },
+      {
+        "name": "No Response",
+        "count": 985
+      }
+    ],
+    "byDept": [
+      {
+        "code": "01",
+        "count": 982,
+        "active": 466,
+        "ltv": 413056.2
+      },
+      {
+        "code": "02",
+        "count": 204,
+        "active": 87,
+        "ltv": 82045.94
+      },
+      {
+        "code": "03",
+        "count": 116,
+        "active": 55,
+        "ltv": 56429.64
+      },
+      {
+        "code": "04",
+        "count": 110,
+        "active": 51,
+        "ltv": 115946.07
+      },
+      {
+        "code": "05",
+        "count": 56,
+        "active": 27,
+        "ltv": 13419.98
+      },
+      {
+        "code": "06",
+        "count": 1552,
+        "active": 681,
+        "ltv": 598390.16
+      },
+      {
+        "code": "07",
+        "count": 182,
+        "active": 84,
+        "ltv": 66101.93
+      },
+      {
+        "code": "08",
+        "count": 126,
+        "active": 59,
+        "ltv": 28476.21
+      },
+      {
+        "code": "09",
+        "count": 47,
+        "active": 17,
+        "ltv": 17409.83
+      },
+      {
+        "code": "10",
+        "count": 804,
+        "active": 269,
+        "ltv": 267196.37
+      },
+      {
+        "code": "11",
+        "count": 321,
+        "active": 106,
+        "ltv": 100055.45
+      },
+      {
+        "code": "12",
+        "count": 227,
+        "active": 89,
+        "ltv": 101024.61
+      },
+      {
+        "code": "13",
+        "count": 12359,
+        "active": 4769,
+        "ltv": 9520089.24
+      },
+      {
+        "code": "14",
+        "count": 327,
+        "active": 132,
+        "ltv": 141889.75
+      },
+      {
+        "code": "15",
+        "count": 32,
+        "active": 12,
+        "ltv": 2635.01
+      },
+      {
+        "code": "16",
+        "count": 177,
+        "active": 71,
+        "ltv": 91271.97
+      },
+      {
+        "code": "17",
+        "count": 155,
+        "active": 61,
+        "ltv": 35402.61
+      },
+      {
+        "code": "18",
+        "count": 217,
+        "active": 89,
+        "ltv": 81923.81
+      },
+      {
+        "code": "19",
+        "count": 97,
+        "active": 35,
+        "ltv": 65730.91
+      },
+      {
+        "code": "21",
+        "count": 768,
+        "active": 333,
+        "ltv": 377715.7
+      },
+      {
+        "code": "22",
+        "count": 120,
+        "active": 55,
+        "ltv": 34269.46
+      },
+      {
+        "code": "23",
+        "count": 26,
+        "active": 14,
+        "ltv": 20195.23
+      },
+      {
+        "code": "24",
+        "count": 81,
+        "active": 39,
+        "ltv": 16880.79
+      },
+      {
+        "code": "25",
+        "count": 812,
+        "active": 365,
+        "ltv": 381858.15
+      },
+      {
+        "code": "26",
+        "count": 639,
+        "active": 252,
+        "ltv": 208285.37
+      },
+      {
+        "code": "27",
+        "count": 430,
+        "active": 183,
+        "ltv": 186087.84
+      },
+      {
+        "code": "28",
+        "count": 525,
+        "active": 215,
+        "ltv": 236817.59
+      },
+      {
+        "code": "29",
+        "count": 221,
+        "active": 90,
+        "ltv": 134741.24
+      },
+      {
+        "code": "2A",
+        "count": 109,
+        "active": 44,
+        "ltv": 43175.23
+      },
+      {
+        "code": "2B",
+        "count": 68,
+        "active": 30,
+        "ltv": 57759.38
+      },
+      {
+        "code": "30",
+        "count": 868,
+        "active": 356,
+        "ltv": 686920.68
+      },
+      {
+        "code": "31",
+        "count": 2373,
+        "active": 956,
+        "ltv": 1043024.91
+      },
+      {
+        "code": "32",
+        "count": 46,
+        "active": 14,
+        "ltv": 10291
+      },
+      {
+        "code": "33",
+        "count": 1155,
+        "active": 469,
+        "ltv": 355251.98
+      },
+      {
+        "code": "34",
+        "count": 1876,
+        "active": 739,
+        "ltv": 598963.95
+      },
+      {
+        "code": "35",
+        "count": 540,
+        "active": 223,
+        "ltv": 144637.53
+      },
+      {
+        "code": "36",
+        "count": 76,
+        "active": 37,
+        "ltv": 27824.87
+      },
+      {
+        "code": "37",
+        "count": 460,
+        "active": 194,
+        "ltv": 177247.66
+      },
+      {
+        "code": "38",
+        "count": 2086,
+        "active": 912,
+        "ltv": 788743.12
+      },
+      {
+        "code": "39",
+        "count": 184,
+        "active": 80,
+        "ltv": 80689.17
+      },
+      {
+        "code": "40",
+        "count": 135,
+        "active": 44,
+        "ltv": 38391.23
+      },
+      {
+        "code": "41",
+        "count": 212,
+        "active": 94,
+        "ltv": 64911.98
+      },
+      {
+        "code": "42",
+        "count": 1317,
+        "active": 615,
+        "ltv": 505077.03
+      },
+      {
+        "code": "43",
+        "count": 90,
+        "active": 49,
+        "ltv": 55838.17
+      },
+      {
+        "code": "44",
+        "count": 836,
+        "active": 326,
+        "ltv": 237305.23
+      },
+      {
+        "code": "45",
+        "count": 1572,
+        "active": 636,
+        "ltv": 688453.01
+      },
+      {
+        "code": "46",
+        "count": 50,
+        "active": 24,
+        "ltv": 55228.42
+      },
+      {
+        "code": "47",
+        "count": 197,
+        "active": 76,
+        "ltv": 66383.97
+      },
+      {
+        "code": "48",
+        "count": 26,
+        "active": 7,
+        "ltv": 4705
+      },
+      {
+        "code": "49",
+        "count": 364,
+        "active": 131,
+        "ltv": 101675.05
+      },
+      {
+        "code": "50",
+        "count": 97,
+        "active": 34,
+        "ltv": 59531.59
+      },
+      {
+        "code": "51",
+        "count": 800,
+        "active": 333,
+        "ltv": 387745
+      },
+      {
+        "code": "52",
+        "count": 66,
+        "active": 33,
+        "ltv": 12012.2
+      },
+      {
+        "code": "53",
+        "count": 95,
+        "active": 36,
+        "ltv": 22860.22
+      },
+      {
+        "code": "54",
+        "count": 759,
+        "active": 319,
+        "ltv": 259048.62
+      },
+      {
+        "code": "55",
+        "count": 76,
+        "active": 49,
+        "ltv": 37985.38
+      },
+      {
+        "code": "56",
+        "count": 153,
+        "active": 65,
+        "ltv": 21934.95
+      },
+      {
+        "code": "57",
+        "count": 1845,
+        "active": 878,
+        "ltv": 840317.07
+      },
+      {
+        "code": "58",
+        "count": 94,
+        "active": 22,
+        "ltv": 28926.69
+      },
+      {
+        "code": "59",
+        "count": 3900,
+        "active": 1617,
+        "ltv": 1684256.47
+      },
+      {
+        "code": "60",
+        "count": 1485,
+        "active": 598,
+        "ltv": 637295.21
+      },
+      {
+        "code": "61",
+        "count": 156,
+        "active": 64,
+        "ltv": 37515.52
+      },
+      {
+        "code": "62",
+        "count": 697,
+        "active": 282,
+        "ltv": 210578.58
+      },
+      {
+        "code": "63",
+        "count": 726,
+        "active": 288,
+        "ltv": 354376.19
+      },
+      {
+        "code": "64",
+        "count": 219,
+        "active": 81,
+        "ltv": 57230.25
+      },
+      {
+        "code": "65",
+        "count": 64,
+        "active": 23,
+        "ltv": 39729.25
+      },
+      {
+        "code": "66",
+        "count": 361,
+        "active": 143,
+        "ltv": 94310.07
+      },
+      {
+        "code": "67",
+        "count": 1729,
+        "active": 694,
+        "ltv": 753860.21
+      },
+      {
+        "code": "68",
+        "count": 1193,
+        "active": 485,
+        "ltv": 598649.46
+      },
+      {
+        "code": "69",
+        "count": 7445,
+        "active": 3649,
+        "ltv": 3482276.03
+      },
+      {
+        "code": "70",
+        "count": 139,
+        "active": 66,
+        "ltv": 34589.33
+      },
+      {
+        "code": "71",
+        "count": 387,
+        "active": 162,
+        "ltv": 126673.7
+      },
+      {
+        "code": "72",
+        "count": 280,
+        "active": 117,
+        "ltv": 121249.43
+      },
+      {
+        "code": "73",
+        "count": 459,
+        "active": 203,
+        "ltv": 168918.13
+      },
+      {
+        "code": "74",
+        "count": 1435,
+        "active": 675,
+        "ltv": 678777.38
+      },
+      {
+        "code": "75",
+        "count": 5753,
+        "active": 2304,
+        "ltv": 3760724.1
+      },
+      {
+        "code": "76",
+        "count": 1464,
+        "active": 600,
+        "ltv": 674084.38
+      },
+      {
+        "code": "77",
+        "count": 4625,
+        "active": 2040,
+        "ltv": 2483608.5
+      },
+      {
+        "code": "78",
+        "count": 5306,
+        "active": 2213,
+        "ltv": 2898959.49
+      },
+      {
+        "code": "79",
+        "count": 66,
+        "active": 30,
+        "ltv": 30125.78
+      },
+      {
+        "code": "80",
+        "count": 447,
+        "active": 190,
+        "ltv": 136745.1
+      },
+      {
+        "code": "81",
+        "count": 215,
+        "active": 88,
+        "ltv": 72344.24
+      },
+      {
+        "code": "82",
+        "count": 160,
+        "active": 69,
+        "ltv": 48195.62
+      },
+      {
+        "code": "83",
+        "count": 1149,
+        "active": 511,
+        "ltv": 461068.96
+      },
+      {
+        "code": "84",
+        "count": 895,
+        "active": 404,
+        "ltv": 368935.88
+      },
+      {
+        "code": "85",
+        "count": 101,
+        "active": 51,
+        "ltv": 26923.27
+      },
+      {
+        "code": "86",
+        "count": 188,
+        "active": 76,
+        "ltv": 45262.37
+      },
+      {
+        "code": "87",
+        "count": 208,
+        "active": 79,
+        "ltv": 91422.82
+      },
+      {
+        "code": "88",
+        "count": 130,
+        "active": 57,
+        "ltv": 42426.3
+      },
+      {
+        "code": "89",
+        "count": 261,
+        "active": 105,
+        "ltv": 104662.66
+      },
+      {
+        "code": "90",
+        "count": 231,
+        "active": 92,
+        "ltv": 101977.74
+      },
+      {
+        "code": "91",
+        "count": 5130,
+        "active": 2204,
+        "ltv": 3117410.64
+      },
+      {
+        "code": "92",
+        "count": 7521,
+        "active": 3166,
+        "ltv": 4435175.75
+      },
+      {
+        "code": "93",
+        "count": 12848,
+        "active": 5369,
+        "ltv": 7792312.45
+      },
+      {
+        "code": "94",
+        "count": 7266,
+        "active": 3147,
+        "ltv": 4402109.64
+      },
+      {
+        "code": "95",
+        "count": 8217,
+        "active": 3513,
+        "ltv": 5492868.41
+      },
+      {
+        "code": "971",
+        "count": 16,
+        "active": 10,
+        "ltv": 8754
+      },
+      {
+        "code": "972",
+        "count": 20,
+        "active": 7,
+        "ltv": 8331.73
+      },
+      {
+        "code": "973",
+        "count": 6,
+        "active": 2,
+        "ltv": 2909
+      },
+      {
+        "code": "974",
+        "count": 277,
+        "active": 134,
+        "ltv": 105156.93
+      },
+      {
+        "code": "976",
+        "count": 135,
+        "active": 46,
+        "ltv": 36751
+      }
+    ],
+    "byRegion": [
+      {
+        "name": "Île-de-France",
+        "count": 56666,
+        "active": 23956,
+        "ltv": 34383168.98
+      },
+      {
+        "name": "Provence-Alpes-Côte d'Azur",
+        "count": 16121,
+        "active": 6443,
+        "ltv": 11077850.29
+      },
+      {
+        "name": "Auvergne-Rhône-Alpes",
+        "count": 15509,
+        "active": 7260,
+        "ltv": 6780514.2
+      },
+      {
+        "name": "Grand Est",
+        "count": 7528,
+        "active": 3176,
+        "ltv": 3227716.82
+      },
+      {
+        "name": "Hauts-de-France",
+        "count": 6733,
+        "active": 2774,
+        "ltv": 2750921.3
+      },
+      {
+        "name": "Occitanie",
+        "count": 6634,
+        "active": 2631,
+        "ltv": 2872203.03
+      },
+      {
+        "name": "Centre-Val de Loire",
+        "count": 3062,
+        "active": 1265,
+        "ltv": 1277178.92
+      },
+      {
+        "name": "Bourgogne-Franche-Comté",
+        "count": 2876,
+        "active": 1225,
+        "ltv": 1237093.14
+      },
+      {
+        "name": "Nouvelle-Aquitaine",
+        "count": 2704,
+        "active": 1075,
+        "ltv": 913549.91
+      },
+      {
+        "name": "Normandie",
+        "count": 2474,
+        "active": 1013,
+        "ltv": 1099109.08
+      },
+      {
+        "name": "Pays de la Loire",
+        "count": 1676,
+        "active": 661,
+        "ltv": 510013.2
+      },
+      {
+        "name": "Bretagne",
+        "count": 1034,
+        "active": 433,
+        "ltv": 335583.18
+      },
+      {
+        "name": "La Réunion",
+        "count": 277,
+        "active": 134,
+        "ltv": 105156.93
+      },
+      {
+        "name": "Corse",
+        "count": 177,
+        "active": 74,
+        "ltv": 100934.61
+      },
+      {
+        "name": "Mayotte",
+        "count": 135,
+        "active": 46,
+        "ltv": 36751
+      },
+      {
+        "name": "Martinique",
+        "count": 20,
+        "active": 7,
+        "ltv": 8331.73
+      },
+      {
+        "name": "Guadeloupe",
+        "count": 16,
+        "active": 10,
+        "ltv": 8754
+      },
+      {
+        "name": "Guyane",
+        "count": 6,
+        "active": 2,
+        "ltv": 2909
+      }
+    ]
+  }
+}
