@@ -24,6 +24,7 @@ const REPO = resolve(__dirname, '..');
 // production data is never served as a static file. The serverless /api/data
 // function bundles + serves this seed when no upload exists yet.
 const OUT = resolve(REPO, 'api/_data/seed-donverse.json');
+const OUT_PUBLIC = resolve(REPO, 'public/data/donverse.json'); // static fallback served to the client
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -151,6 +152,8 @@ const { data: output, extras } = aggregateDonverseWithExtras(txData, donorData, 
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(output, null, 2));
+mkdirSync(dirname(OUT_PUBLIC), { recursive: true });
+writeFileSync(OUT_PUBLIC, JSON.stringify(output));
 
 // ================= SUMMARY =================
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
