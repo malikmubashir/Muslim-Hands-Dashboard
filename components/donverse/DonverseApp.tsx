@@ -1,14 +1,17 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Map as MapIcon, Users, Loader2, AlertTriangle,
-  RefreshCw, CheckCircle2, LucideIcon,
+  RefreshCw, CheckCircle2, LucideIcon, Info,
 } from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
+import { ThemeDetail } from './ThemeDetail';
+import { DateRangeBar, DateRange } from './DateRangeBar';
 import UpdateDataModal from './UpdateDataModal';
 import { loadDataset, LoadedDataset } from '../../services/donverseClient';
+import { sliceCube } from '../../services/cube';
 
 const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
   { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -23,6 +26,8 @@ const DonverseApp: React.FC = () => {
   const [view, setView] = useState<DonverseView>('overview');
   const [showUpdate, setShowUpdate] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setError(null);
@@ -31,6 +36,11 @@ const DonverseApp: React.FC = () => {
       .then((res) => {
         setData(res.data);
         setMeta({ source: res.source, lastUpdated: res.lastUpdated });
+        // Default the date range to the full available period.
+        const months = res.data.months || [];
+        if (months.length) {
+          setRange({ start: months[0], end: months[months.length - 1] });
+        }
       })
       .catch((e: any) => {
         setError(String(e?.message || e));
@@ -57,6 +67,17 @@ const DonverseApp: React.FC = () => {
     return `Données de référence (2025)${when ? ' · ' + when : ''}`;
   })();
 
+  const months = data?.months || [];
+  const hasCube = !!(data?.cube && data.cube.length && months.length);
+
+  // Share of the selected theme over the whole range total (for drill-down KPI).
+  const themeShare = useMemo(() => {
+    if (!data || !range || !selectedTheme) return 0;
+    const all = sliceCube(data, range);
+    const t = all.byTheme.find((x) => x.name === selectedTheme);
+    return all.total && t ? t.value / all.total : 0;
+  }, [data, range, selectedTheme]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -72,8 +93,8 @@ const DonverseApp: React.FC = () => {
               className="h-10 w-10"
             />
             <div>
-              <h1 className="text-xl font-bold leading-tight tracking-tight text-white">MH DONVERSE</h1>
-              <p className="text-white/80 text-sm">Console de Pilotage — Muslim Hands France</p>
+              <h1 className="text-xl font-bold leading-tight tracking-tight text-white">Muslim Hands France</h1>
+              <p className="text-white/80 text-sm">Console de pilotage des collectes</p>
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -99,7 +120,7 @@ const DonverseApp: React.FC = () => {
               return (
                 <button
                   key={t.key}
-                  onClick={() => setView(t.key)}
+                  onClick={() => { setView(t.key); setSelectedTheme(null); }}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     active
                       ? 'border-white text-white'
@@ -131,12 +152,43 @@ const DonverseApp: React.FC = () => {
           </div>
         )}
 
-        {data && (
-          <>
-            {view === 'overview' && <OverviewView data={data} />}
-            {view === 'map' && <FranceMapView data={data} />}
-            {view === 'donors' && <DonorsView data={data} />}
-          </>
+        {data && range && (
+          <div className="space-y-6">
+            {/* Global date-range control — applies to Tableau de bord, Carte + drill-down */}
+            {hasCube && (view === 'overview' || view === 'map') && (
+              <DateRangeBar months={months} range={range} onChange={setRange} />
+            )}
+
+            {view === 'overview' && (
+              hasCube ? (
+                selectedTheme ? (
+                  <ThemeDetail
+                    data={data}
+                    theme={selectedTheme}
+                    range={range}
+                    shareOfTotal={themeShare}
+                    onBack={() => setSelectedTheme(null)}
+                  />
+                ) : (
+                  <OverviewView data={data} range={range} onSelectTheme={setSelectedTheme} />
+                )
+              ) : (
+                <LegacyNotice />
+              )
+            )}
+            {view === 'map' && (
+              <FranceMapView data={data} range={hasCube ? range : undefined} />
+            )}
+            {view === 'donors' && (
+              <>
+                <div className="flex items-center gap-2 text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  <Info size={14} className="text-blue-500 shrink-0" />
+                  Instantané, non filtré par date.
+                </div>
+                <DonorsView data={data} />
+              </>
+            )}
+          </div>
         )}
       </main>
 
@@ -163,5 +215,14 @@ const DonverseApp: React.FC = () => {
     </div>
   );
 };
+
+// Shown if the loaded dataset predates the cube (no month×theme breakdowns).
+const LegacyNotice: React.FC = () => (
+  <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
+    Ce jeu de données ne contient pas le cube (mois × thème) requis pour le filtre
+    par période et l’exploration par cause. Mettez à jour les données pour activer
+    ces fonctionnalités.
+  </div>
+);
 
 export default DonverseApp;

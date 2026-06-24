@@ -38,7 +38,13 @@ const postcodeWeight = (
   }
 };
 
-export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
+interface FranceMapProps {
+  data: DonverseData;
+  /** Active date range — when set (with cube), the choropleth is range-filtered. */
+  range?: { start: string; end: string };
+}
+
+export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
   const [gran, setGran] = useState<Granularity>('dept');
   const [metric, setMetric] = useState<MetricKey>('amount');
   const [geo, setGeo] = useState<Record<Granularity, any>>({ dept: null, region: null, postcode: null });
@@ -53,8 +59,8 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
   const fittedRef = useRef<Granularity | null>(null);
 
-  // Consolidated area index for the current granularity.
-  const areaIndex = useMemo(() => buildAreaIndex(data, gran), [data, gran]);
+  // Consolidated area index for the current granularity (range-filtered when cube present).
+  const areaIndex = useMemo(() => buildAreaIndex(data, gran, range), [data, gran, range]);
 
   // Quantile breaks over the metric values present on the map (excludes DOM with no polygon implicitly via index keys, but keeps all areas).
   const breaks = useMemo(() => {
@@ -273,9 +279,9 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
 
   const detail = selected || hovered;
   const domRows = useMemo(() => {
-    const idxDept = buildAreaIndex(data, 'dept');
+    const idxDept = buildAreaIndex(data, 'dept', range);
     return DOM.map((d) => ({ ...d, row: idxDept.get(d.code) }));
-  }, [data]);
+  }, [data, range]);
 
   const metricLabel = METRICS.find((m) => m.key === metric)!.label;
 
@@ -318,6 +324,12 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
             <RotateCcw size={14} /> Réinitialiser
           </button>
         )}
+
+        {range && gran !== 'postcode' && (
+          <span className="ml-auto text-xs text-gray-400">
+            Choroplèthe filtré par la période sélectionnée
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -343,6 +355,9 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
                 <p className="text-xs text-gray-500">
                   Carte de chaleur par code postal · les zones de moins de{' '}
                   {data.meta.suppressMinDonors ?? 5} donateurs sont masquées.
+                </p>
+                <p className="text-xs text-gray-400">
+                  Carte de chaleur sur l’année complète (non filtrée par la période).
                 </p>
               </div>
             ) : (

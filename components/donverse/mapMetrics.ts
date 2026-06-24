@@ -1,4 +1,5 @@
 import { DonverseData } from './types';
+import { sliceCube } from '../../services/cube';
 
 export type Granularity = 'dept' | 'region' | 'postcode';
 export type MetricKey = 'amount' | 'count' | 'avg' | 'donors' | 'active';
@@ -35,7 +36,15 @@ export const metricValue = (row: AreaRow | undefined, m: MetricKey): number => {
 };
 
 // Build a Map<areaKey, AreaRow> for the selected granularity.
-export function buildAreaIndex(data: DonverseData, gran: Granularity): Map<string, AreaRow> {
+// When `range` is provided AND the cube is present, the tx amount/count come
+// from the date-filtered cube slice; donor counts always come from the full
+// (un-filtered) donor snapshot. Without a range we use the legacy full-period
+// tx aggregates (data.tx.*).
+export function buildAreaIndex(
+  data: DonverseData,
+  gran: Granularity,
+  range?: { start: string; end: string },
+): Map<string, AreaRow> {
   const idx = new Map<string, AreaRow>();
   const ensure = (key: string, name: string): AreaRow => {
     let r = idx.get(key);
@@ -43,19 +52,36 @@ export function buildAreaIndex(data: DonverseData, gran: Granularity): Map<strin
     return r;
   };
 
+  const useCube = !!(range && data.cube && data.cube.length);
+  const slice = useCube ? sliceCube(data, range!) : null;
+
   if (gran === 'dept') {
-    for (const t of data.tx.byDept) {
-      const r = ensure(t.code, t.code);
-      r.amount = t.value; r.count = t.count;
+    if (slice) {
+      for (const t of slice.byDept) {
+        const r = ensure(t.code, t.code);
+        r.amount = t.value; r.count = t.count;
+      }
+    } else {
+      for (const t of data.tx.byDept) {
+        const r = ensure(t.code, t.code);
+        r.amount = t.value; r.count = t.count;
+      }
     }
     for (const dn of data.donors.byDept) {
       const r = ensure(dn.code, dn.code);
       r.donors = dn.count; r.active = dn.active; r.ltv = dn.ltv;
     }
   } else {
-    for (const t of data.tx.byRegion) {
-      const r = ensure(t.name, t.name);
-      r.amount = t.value; r.count = t.count;
+    if (slice) {
+      for (const t of slice.byRegion) {
+        const r = ensure(t.name, t.name);
+        r.amount = t.value; r.count = t.count;
+      }
+    } else {
+      for (const t of data.tx.byRegion) {
+        const r = ensure(t.name, t.name);
+        r.amount = t.value; r.count = t.count;
+      }
     }
     for (const dn of data.donors.byRegion) {
       const r = ensure(dn.name, dn.name);

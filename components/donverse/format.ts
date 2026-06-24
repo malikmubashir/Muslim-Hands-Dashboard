@@ -30,9 +30,38 @@ export const MH = {
   emerald: '#28B8D8',    // brand 500
 };
 
-// Categorical palette (turquoise-led, with supporting hues for pies)
+// Categorical palette — turquoise-led, then 11 distinct attractive hues.
+// Applied per-Cell so each bar/slice gets a different color.
 export const PALETTE = [
-  '#28B8D8', '#1C8099', '#6FD9E9', '#1B6878', '#9FE7F1',
-  '#1098ad', '#4263eb', '#7048e8', '#e8590c', '#f08c00',
-  '#c2255c', '#868e96',
+  '#28B8D8', // brand turquoise
+  '#F59E0B', // amber
+  '#EF4444', // coral
+  '#8B5CF6', // violet
+  '#10B981', // green
+  '#3B82F6', // blue
+  '#EC4899', // pink
+  '#14B8A6', // teal
+  '#F97316', // orange
+  '#6366F1', // indigo
+  '#84CC16', // lime
+  '#06B6D4', // cyan
 ];
+
+// Stable color for a category index.
+export const paletteAt = (i: number) => PALETTE[((i % PALETTE.length) + PALETTE.length) % PALETTE.length];
+
+// Month label helper, e.g. "2024-12" -> "déc. 2024".
+const MONTH_NAMES = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+export const fmtMonth = (m: string) => {
+  const [y, mm] = (m || '').split('-');
+  const idx = parseInt(mm, 10) - 1;
+  if (!y || isNaN(idx)) return m || '';
+  return `${MONTH_NAMES[idx]} ${y}`;
+};
+// Short month label for axes, e.g. "déc. 24".
+export const fmtMonthShort = (m: string) => {
+  const [y, mm] = (m || '').split('-');
+  const idx = parseInt(mm, 10) - 1;
+  if (!y || isNaN(idx)) return m || '';
+  return `${MONTH_NAMES[idx]} ${y.slice(2)}`;
+};
