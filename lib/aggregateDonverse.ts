@@ -27,6 +27,9 @@ export interface AggregateExtras {
   /** Sum of base amount over all rows with a valid FR postcode (pre-suppression). */
   validPostcodeTxValue: number;
   validPostcodeTxCount: number;
+  /** Base amount excluded from the cube due to invalid/unparseable month. */
+  cubeExcludedValue: number;
+  cubeExcludedCount: number;
 }
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -81,6 +84,10 @@ function normPayment(v: any): string {
 function normSimple(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
   return t === '' ? 'Non spécifié' : t;
+}
+function normCity(v: any): string {
+  const t = (v == null ? '' : String(v)).trim().toUpperCase();
+  return t === '' ? 'NON SPÉCIFIÉ' : t;
 }
 
 // Department code from a postal code. Returns null if not a valid France dept.
@@ -195,6 +202,21 @@ export function aggregateDonverseWithExtras(
   const byCountry = new Map<string, Slice>();
   const byPostcodeTx = new Map<string, { value: number; count: number }>();
 
+  // ---- Cube (month × theme) accumulators ----
+  interface CubeAcc {
+    v: number; c: number;
+    stip: Map<string, Slice>;
+    pay: Map<string, Slice>;   // Slice.isPA carried per family
+    dest: Map<string, Slice>;
+    city: Map<string, Slice>;
+    dept: Map<string, Slice>;
+  }
+  const cubeMap = new Map<string, CubeAcc>(); // key = `${month}${theme}`
+  const themeFullTotal = new Map<string, number>(); // theme -> full-period base total
+  const monthSet = new Set<string>();
+  let cubeExcludedValue = 0; // base amount on rows with invalid/unparseable month
+  let cubeExcludedCount = 0;
+
   let txTotalBase = 0;
   let nonFranceTotal = 0;
   let validPostcodeTxValue = 0;
@@ -215,6 +237,7 @@ export function aggregateDonverseWithExtras(
     const dept = deptFromPostal(r['Postal Code']);
     const month = toMonth(r['Date']);
     const postcode = normPostcode(r['Postal Code']);
+    const city = normCity(r['Locality']);
 
     addSlice(byTheme, theme, amount);
     addSlice(byStipulation, stip, amount);
@@ -242,6 +265,35 @@ export function aggregateDonverseWithExtras(
       m.amount += amount; m.count += 1;
       if (monthMin === null || month < monthMin) monthMin = month;
       if (monthMax === null || month > monthMax) monthMax = month;
+    }
+
+    // ---- Cube (month × theme) ----
+    // Rows with an invalid/unparseable month are excluded from the cube
+    // (consistent with byMonth above), but counted in txTotalBase (which
+    // sums every row). Track the excluded amount for transparent reconcile.
+    themeFullTotal.set(theme, (themeFullTotal.get(theme) || 0) + amount);
+    if (month) {
+      monthSet.add(month);
+      // month is always exactly 7 chars ("YYYY-MM"); split at fixed pos 7.
+      const key = month + theme;
+      let cell = cubeMap.get(key);
+      if (!cell) {
+        cell = {
+          v: 0, c: 0,
+          stip: new Map(), pay: new Map(), dest: new Map(),
+          city: new Map(), dept: new Map(),
+        };
+        cubeMap.set(key, cell);
+      }
+      cell.v += amount; cell.c += 1;
+      addSlice(cell.stip, stip, amount);
+      addSlice(cell.pay, payment, amount, { isPA }).isPA = isPA;
+      addSlice(cell.dest, dest, amount);
+      addSlice(cell.city, city, amount);
+      if (dept && VALID_DEPTS.has(dept)) addSlice(cell.dept, dept, amount);
+    } else {
+      cubeExcludedValue += amount;
+      cubeExcludedCount += 1;
     }
   }
 
@@ -346,6 +398,47 @@ export function aggregateDonverseWithExtras(
   const dByRegionArr = [...dByRegion.entries()].map(([name, e]) => ({ name, count: e.count, active: e.active, ltv: round2(e.ltv) }))
     .sort((a, b) => b.count - a.count);
 
+  // ================= ASSEMBLE CUBE (month × theme) =================
+  const months = [...monthSet].sort((a, b) => a.localeCompare(b));
+  const themes = [...themeFullTotal.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name]) => name);
+
+  // Convert a Slice map to a sorted positional-tuple array (value desc).
+  const stipArr = (m: Map<string, Slice>): [string, number, number][] =>
+    [...m.entries()].map(([k, e]) => [k, round2(e.value), e.count] as [string, number, number])
+      .sort((a, b) => b[1] - a[1]);
+  const payArr = (m: Map<string, Slice>): [string, number, number, 0 | 1][] =>
+    [...m.entries()].map(([k, e]) => [k, round2(e.value), e.count, (e.isPA ? 1 : 0) as 0 | 1] as [string, number, number, 0 | 1])
+      .sort((a, b) => b[1] - a[1]);
+
+  const cube = [...cubeMap.entries()].map(([key, cell]) => {
+    const m = key.slice(0, 7);   // "YYYY-MM"
+    const t = key.slice(7);      // theme
+    return {
+      m, t,
+      v: round2(cell.v),
+      c: cell.c,
+      stip: stipArr(cell.stip),
+      pay: payArr(cell.pay),
+      dest: stipArr(cell.dest),
+      // city is HIGH cardinality: store TOP 30 by value.
+      city: stipArr(cell.city).slice(0, 30),
+      dept: stipArr(cell.dept),
+    };
+  }).sort((a, b) => (a.m === b.m ? a.t.localeCompare(b.t) : a.m.localeCompare(b.m)));
+
+  // regionByDept: only the dept codes that actually appear in tx data.
+  const regionByDept: Record<string, string> = {};
+  for (const code of byDept.keys()) regionByDept[code] = DEPT_TO_REGION[code];
+
+  // postcodeGlobal: FULL period (not theme/date filtered), reuses the
+  // already-computed suppressed tx postcode aggregation.
+  const postcodeGlobal = {
+    byPostcode: txByPostcode.map(p => ({ postcode: p.postcode, value: p.value, count: p.count })),
+    suppressed: { count: txSuppCount, value: round2(txSuppValue) },
+  };
+
   const data: DonverseData = {
     meta: {
       generatedAt: opts?.generatedAt ?? new Date().toISOString(),
@@ -359,6 +452,7 @@ export function aggregateDonverseWithExtras(
       note: 'Region names match regions.geojson `nom` exactly (13 metropolitan regions). DOM departments (971-976) and their regions appear in the data slices for completeness but have NO polygon in the metropolitan france-geojson, so they will not render on the choropleth map.',
       suppressMinDonors,
       postcodesSuppressed,
+      schema: 'cube-v2',
     },
     tx: {
       byDept: txByDept,
@@ -384,6 +478,11 @@ export function aggregateDonverseWithExtras(
       byPostcode: donorsByPostcode,
       postcodeSuppressed: { count: donorSuppCount },
     },
+    months,
+    themes,
+    cube,
+    regionByDept,
+    postcodeGlobal,
   };
 
   return {
@@ -392,6 +491,8 @@ export function aggregateDonverseWithExtras(
       nonFranceTotal: round2(nonFranceTotal),
       validPostcodeTxValue: round2(validPostcodeTxValue),
       validPostcodeTxCount,
+      cubeExcludedValue: round2(cubeExcludedValue),
+      cubeExcludedCount,
     },
   };
 }

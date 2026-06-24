@@ -169,6 +169,20 @@ console.log('donorRows:', output.meta.donorRows, '| donors.total:', donorTotal, 
 console.log('#depts (tx):', output.tx.byDept.length, '| #regions (tx):', output.tx.byRegion.length);
 console.log('monthMin:', output.meta.monthMin, 'monthMax:', output.meta.monthMax);
 console.log('nonFranceTotal: €' + fmt(nonFranceTotal));
+console.log('schema:', output.meta.schema);
+
+// ================= CUBE SUMMARY =================
+const cube = output.cube || [];
+const months = output.months || [];
+const themes = output.themes || [];
+console.log('\n========== CUBE (month × theme) ==========');
+console.log(`months: ${months.length} (${months[0] || '-'} .. ${months[months.length - 1] || '-'})`);
+console.log(`themes: ${themes.length}`);
+console.log(`cube cells: ${cube.length}  (max possible months×themes = ${months.length * themes.length})`);
+console.log(`regionByDept entries: ${Object.keys(output.regionByDept || {}).length}`);
+const pg = output.postcodeGlobal || { byPostcode: [], suppressed: { count: 0, value: 0 } };
+console.log(`postcodeGlobal: ${pg.byPostcode.length} postcodes published | suppressed ${pg.suppressed.count} tx, €${fmt(pg.suppressed.value)}`);
+console.log(`cube excluded (invalid month): ${extras.cubeExcludedCount} rows, €${fmt(extras.cubeExcludedValue)}`);
 
 console.log('\nTop 5 depts by value:');
 [...output.tx.byDept].sort((a, b) => b.value - a.value).slice(0, 5)
@@ -215,6 +229,26 @@ const c4 = sumTier === donorTotal;
 const c5 = Math.abs(sumTxPcAll - extras.validPostcodeTxValue) <= TOL;
 const c6 = sumDonorPcAll === undefined ? false : true; // donor PC bucketing is exact integer
 
+// ---- Cube reconcile ----
+// sum over cube cells of v + excluded(invalid-month) value ≈ txTotalBase.
+const sumCubeV = cube.reduce((s, c) => s + c.v, 0);
+const sumCubePlusExcluded = sumCubeV + extras.cubeExcludedValue;
+const c7 = Math.abs(sumCubePlusExcluded - txTotalBase) <= TOL;
+// Sample cell reconcile: stip & dept sum to cell.v (stored in full).
+const sampleTheme = themes[0];
+const sample = cube.find((c) => c.t === sampleTheme) // first month of top theme
+  || cube[0];
+let c8 = true, c9 = true;
+let sampleStipSum = 0, sampleDeptSum = 0;
+if (sample) {
+  sampleStipSum = sample.stip.reduce((s, x) => s + x[1], 0);
+  sampleDeptSum = sample.dept.reduce((s, x) => s + x[1], 0);
+  c8 = Math.abs(sampleStipSum - sample.v) <= TOL;
+  // dept may be < v if some rows had no valid FR dept; treat <= v + tol as OK,
+  // but report. Exact equality only when all rows in cell have a valid dept.
+  c9 = sampleDeptSum <= sample.v + TOL;
+}
+
 console.log('\n========== RECONCILE ==========');
 console.log(`sum(byTheme.value)=€${fmt(round2(sumThemes))} vs txTotalBase=€${fmt(txTotalBase)} -> ${c1 ? 'OK' : 'MISMATCH'}`);
 console.log(`sum(byDept)=€${fmt(round2(sumDept))} + nonFrance=€${fmt(round2(nonFranceTotal))} = €${fmt(round2(sumDeptPlusNonFrance))} vs txTotalBase=€${fmt(txTotalBase)} -> ${c2 ? 'OK' : 'MISMATCH'}`);
@@ -222,8 +256,15 @@ console.log(`sum(byActivity.count)=${sumActivity} vs donors.total=${donorTotal} 
 console.log(`sum(byTier.count)=${sumTier} vs donors.total=${donorTotal} -> ${c4 ? 'OK' : 'MISMATCH'}`);
 console.log(`sum(tx.byPostcode.value)=€${fmt(round2(sumTxPc))} + suppressed=€${fmt(round2(txSupp.value))} = €${fmt(round2(sumTxPcAll))} vs validPostcodeTxValue=€${fmt(extras.validPostcodeTxValue)} -> ${c5 ? 'OK' : 'MISMATCH'}`);
 console.log(`donors.byPostcode bucketing: published=${sumDonorPc} + suppressed=${donorSupp.count} = ${sumDonorPcAll} -> ${c6 ? 'OK' : 'MISMATCH'}`);
+console.log(`sum(cube.v)=€${fmt(round2(sumCubeV))} + excluded(invalid-month)=€${fmt(round2(extras.cubeExcludedValue))} = €${fmt(round2(sumCubePlusExcluded))} vs txTotalBase=€${fmt(txTotalBase)} -> ${c7 ? 'OK' : 'MISMATCH'}`);
+if (sample) {
+  console.log(`sample cell [${sample.m} / ${sample.t}]: v=€${fmt(sample.v)} count=${sample.c}`);
+  console.log(`  sum(stip)=€${fmt(round2(sampleStipSum))} vs v=€${fmt(sample.v)} -> ${c8 ? 'OK' : 'MISMATCH'}`);
+  console.log(`  sum(dept)=€${fmt(round2(sampleDeptSum))} (<= v, remainder = non-FR) -> ${c9 ? 'OK' : 'MISMATCH'}`);
+  console.log(`  stip entries=${sample.stip.length} pay=${sample.pay.length} dest=${sample.dest.length} city(top30)=${sample.city.length} dept=${sample.dept.length}`);
+}
 
-const pass = c1 && c2 && c3 && c4 && c5 && c6;
+const pass = c1 && c2 && c3 && c4 && c5 && c6 && c7 && c8 && c9;
 console.log('RECONCILE: ' + (pass ? 'PASS' : 'FAIL'));
 console.log('\nWrote', OUT);
 if (!pass) process.exit(1);

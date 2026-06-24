@@ -14,6 +14,34 @@ export interface DonorRegionRow { name: string; count: number; active: number; l
 export interface TxPostcodeRow { postcode: string; value: number; count: number; }
 export interface DonorPostcodeRow { postcode: string; count: number; active: number; ltv: number; }
 
+// ---- Cube (month × theme) breakdowns (Phase 9a, schema "cube-v2") ----
+// Per-cell breakdown tuples are stored as positional arrays to keep the JSON
+// compact. stip/pay/dest/dept are LOW cardinality and stored in FULL (exact);
+// city is HIGH cardinality and stored TOP 30 by value per cell.
+export type CubeStip = [string, number, number];          // [name, value, count]
+export type CubePay = [string, number, number, 0 | 1];    // [name, value, count, isPA]
+export type CubeDest = [string, number, number];          // [destination, value, count]
+export type CubeCity = [string, number, number];          // [city, value, count] (TOP 30)
+export type CubeDept = [string, number, number];          // [deptCode, value, count]
+
+export interface CubeCell {
+  m: string;        // month "YYYY-MM"
+  t: string;        // theme
+  v: number;        // amount (base) for this (month,theme)
+  c: number;        // donation count
+  stip: CubeStip[]; // ALL stipulations in this cell
+  pay: CubePay[];   // ALL payment families in this cell
+  dest: CubeDest[]; // ALL destinations in this cell
+  city: CubeCity[]; // TOP 30 cities by value in this cell
+  dept: CubeDept[]; // ALL valid FR dept codes present in this cell
+}
+
+export interface PostcodeGlobalRow { postcode: string; value: number; count: number; }
+export interface PostcodeGlobal {
+  byPostcode: PostcodeGlobalRow[];
+  suppressed: { count: number; value: number };
+}
+
 export interface DonverseData {
   meta: {
     generatedAt: string;
@@ -28,6 +56,8 @@ export interface DonverseData {
     // Postcode small-cell suppression (Phase 7a).
     suppressMinDonors?: number;
     postcodesSuppressed?: number; // # of postcodes omitted from published output
+    // Cube schema version (Phase 9a).
+    schema?: string;
   };
   tx: {
     byDept: TxDeptRow[];
@@ -53,6 +83,12 @@ export interface DonverseData {
     byPostcode?: DonorPostcodeRow[];
     postcodeSuppressed?: { count: number };
   };
+  // ---- Cube (month × theme) for drill-down + date-range filtering (Phase 9a) ----
+  months?: string[];                       // sorted "YYYY-MM" ascending
+  themes?: string[];                       // theme names sorted by full-period total desc
+  cube?: CubeCell[];                       // one cell per (month, theme) that has data
+  regionByDept?: Record<string, string>;   // dept code -> région name
+  postcodeGlobal?: PostcodeGlobal;         // FULL period, suppressMinDonors=5 (heatmap)
 }
 
 export type DonverseView = 'overview' | 'map' | 'donors';
