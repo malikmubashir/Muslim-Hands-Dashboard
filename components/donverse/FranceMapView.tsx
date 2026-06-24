@@ -170,8 +170,11 @@ export const FranceMapView: React.FC<{ data: DonverseData }> = ({ data }) => {
     // (don't re-fit on every metric change — that would yank the user's zoom).
     map.invalidateSize();
     if (fittedRef.current !== gran) {
-      try { map.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch { /* noop */ }
+      // Deterministic France view (a fitBounds/size race could mis-frame on
+      // first paint). Re-assert once the container has its final size.
+      map.setView([46.6, 2.4], 6);
       fittedRef.current = gran;
+      setTimeout(() => { map.invalidateSize(); map.setView([46.6, 2.4], 6); }, 250);
     }
   }, [geo, gran, metric, areaIndex, breaks]);
 
