@@ -4,8 +4,26 @@ import Papa from 'papaparse';
 import { DonationRecord, DateRange, DateBounds } from '../types';
 import { SAMPLE_DATA } from '../constants';
 import { parseDate, formatDateForInput, calculateStats, sumBy, groupBy } from '../services/dataService';
+import {
+  AggregatesFile,
+  loadAggregates,
+  statsFromAggregates,
+  deepDiveFromAggregates,
+  boundsFromMeta,
+  monthRange,
+} from '../services/aggregatesService';
+
+// Two data modes:
+//  - 'aggregates' (DEFAULT): fetches the small pre-aggregated JSON. Date
+//    filtering is MONTH-granular in this mode (the JSON is keyed by YYYY-MM).
+//  - 'raw': activated when the user uploads a CSV. Falls back to the original
+//    day-level raw rows + calculateStats + day-level deep-dive logic.
+type DataMode = 'aggregates' | 'raw';
 
 export const useDashboard = () => {
+  const [mode, setMode] = useState<DataMode>('aggregates');
+  const [aggregates, setAggregates] = useState<AggregatesFile | null>(null);
+
   const [data, setData] = useState<DonationRecord[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -13,10 +31,30 @@ export const useDashboard = () => {
   const [filterDates, setFilterDates] = useState<DateRange>({ start: '', end: '' });
   const [dataBounds, setDataBounds] = useState<DateBounds>({ min: '', max: '' });
 
-  // Load sample data on mount
+  // Load aggregates on mount (DEFAULT source). On failure, fall back to
+  // SAMPLE_DATA so the app never blank-screens.
   useEffect(() => {
-    setData(SAMPLE_DATA);
-    calculateDateBounds(SAMPLE_DATA);
+    let cancelled = false;
+    setLoading(true);
+    loadAggregates()
+      .then((agg) => {
+        if (cancelled) return;
+        setAggregates(agg);
+        setMode('aggregates');
+        const bounds = boundsFromMeta(agg.meta);
+        setDataBounds(bounds);
+        setFilterDates({ start: bounds.min, end: bounds.max });
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load aggregates, falling back to SAMPLE_DATA:', err);
+        if (cancelled) return;
+        setMode('raw');
+        setData(SAMPLE_DATA);
+        calculateDateBounds(SAMPLE_DATA);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const calculateDateBounds = (dataset: DonationRecord[]) => {
@@ -27,13 +65,13 @@ export const useDashboard = () => {
       const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
       const minStr = formatDateForInput(minDate);
       const maxStr = formatDateForInput(maxDate);
-      // Extend bounds to undefined here? No, just keep as strings
       const bounds = { min: minStr, max: maxStr };
       setDataBounds(bounds);
       setFilterDates({ start: minStr, end: maxStr });
     }
   };
 
+  // CSV upload switches to 'raw' mode: day-level raw rows, original logic.
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -43,6 +81,7 @@ export const useDashboard = () => {
         header: true,
         complete: (results) => {
           const cleanData = results.data.filter((row: any) => row['Donation Reference'] || row['Amount']);
+          setMode('raw');
           setData(cleanData);
           calculateDateBounds(cleanData);
           setLoading(false);
@@ -59,7 +98,9 @@ export const useDashboard = () => {
     setFilterDates({ start: dataBounds.min, end: dataBounds.max });
   };
 
+  // ---- RAW mode: day-level filtering (original behavior) -------------------
   const filteredData = useMemo(() => {
+    if (mode !== 'raw') return [];
     if (!data.length) return [];
     if (!filterDates.start || !filterDates.end) return data;
     const start = new Date(filterDates.start);
@@ -69,16 +110,31 @@ export const useDashboard = () => {
       const itemDate = parseDate(item['Donation Date']);
       return itemDate >= start && itemDate <= end;
     });
-  }, [data, filterDates]);
+  }, [mode, data, filterDates]);
 
+  // ---- stats (mode-aware) -------------------------------------------------
   const stats = useMemo(() => {
+    if (mode === 'aggregates') {
+      if (!aggregates) return null;
+      // MONTH-granular date filtering in aggregates mode.
+      return statsFromAggregates(aggregates, monthRange(filterDates));
+    }
     if (!filteredData.length) return null;
     return calculateStats(filteredData);
-  }, [filteredData]);
+  }, [mode, aggregates, filterDates, filteredData]);
 
-  // Specific Deep Dive Logic
+  // ---- deep dive (mode-aware) ---------------------------------------------
   const deepDiveStats = useMemo(() => {
-    if (!filteredData.length || !selectedDeepDiveTheme) return null;
+    if (!selectedDeepDiveTheme) return null;
+
+    if (mode === 'aggregates') {
+      if (!aggregates) return null;
+      // MONTH-granular date filtering in aggregates mode.
+      return deepDiveFromAggregates(aggregates, selectedDeepDiveTheme, monthRange(filterDates));
+    }
+
+    // RAW mode: original day-level deep-dive logic.
+    if (!filteredData.length) return null;
     const currentThemeData = filteredData.filter(d => d['Thème'] === selectedDeepDiveTheme);
     const totalDeepDiveAmount = sumBy(currentThemeData, d => parseFloat(d.Amount || '0'));
     const totalDeepDiveCount = currentThemeData.length;
@@ -88,7 +144,6 @@ export const useDashboard = () => {
       .map(([key, objs]) => ({ name: key || 'Non spécifié', value: sumBy(objs, d => parseFloat(d.Amount || '0')), count: objs.length }))
       .sort((a, b) => b.value - a.value);
 
-    // Monthly aggregation
     const monthlyGroups = currentThemeData.reduce((acc: any, item: DonationRecord) => {
       const dateStr = item['Donation Date'];
       if (!dateStr) return acc;
@@ -106,7 +161,7 @@ export const useDashboard = () => {
 
     const trendByMonth = Object.values(monthlyGroups).sort((a: any, b: any) => a.date.localeCompare(b.date));
     return { bySubType, trendByMonth, totalDeepDiveAmount, totalDeepDiveCount };
-  }, [filteredData, selectedDeepDiveTheme]);
+  }, [mode, aggregates, filterDates, filteredData, selectedDeepDiveTheme]);
 
   return {
     data,
@@ -123,5 +178,6 @@ export const useDashboard = () => {
     handleFileUpload,
     resetFilters,
     calculateDateBounds,
+    mode,
   };
 };
