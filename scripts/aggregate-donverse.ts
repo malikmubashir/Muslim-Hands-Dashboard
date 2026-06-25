@@ -173,16 +173,26 @@ console.log('schema:', output.meta.schema);
 
 // ================= CUBE SUMMARY =================
 const cube = output.cube || [];
+const days = output.days || [];
 const months = output.months || [];
 const themes = output.themes || [];
-console.log('\n========== CUBE (month × theme) ==========');
+console.log('\n========== CUBE (DAY × theme) ==========');
+console.log(`days: ${days.length} (${days[0] || '-'} .. ${days[days.length - 1] || '-'})`);
 console.log(`months: ${months.length} (${months[0] || '-'} .. ${months[months.length - 1] || '-'})`);
+console.log(`dateMin..dateMax: ${output.meta.dateMin || '-'} .. ${output.meta.dateMax || '-'}`);
 console.log(`themes: ${themes.length}`);
-console.log(`cube cells: ${cube.length}  (max possible months×themes = ${months.length * themes.length})`);
+console.log(`cube cells: ${cube.length}  (max possible days×themes = ${days.length * themes.length})`);
 console.log(`regionByDept entries: ${Object.keys(output.regionByDept || {}).length}`);
 const pg = output.postcodeGlobal || { byPostcode: [], suppressed: { count: 0, value: 0 } };
 console.log(`postcodeGlobal: ${pg.byPostcode.length} postcodes published | suppressed ${pg.suppressed.count} tx, €${fmt(pg.suppressed.value)}`);
-console.log(`cube excluded (invalid month): ${extras.cubeExcludedCount} rows, €${fmt(extras.cubeExcludedValue)}`);
+console.log(`cube excluded (invalid date): ${extras.cubeExcludedCount} rows, €${fmt(extras.cubeExcludedValue)}`);
+
+// Confirm the stipulation merge: no "Intérêts bancaires" remains.
+const stipNames = output.tx.byStipulation.map((s) => s.name);
+const leftover = stipNames.filter((n) => /int[ée]r[êe]ts?\s+bancaire/i.test(n));
+const interet = output.tx.byStipulation.find((s) => s.name === 'Intérêt');
+console.log(`\nStipulation merge check: ${leftover.length === 0 ? 'OK — no "Intérêts bancaires" category' : 'LEFTOVER: ' + leftover.join(', ')}`);
+console.log(`  "Intérêt" total: €${fmt(interet ? interet.value : 0)} (${interet ? interet.count : 0} tx)`);
 
 console.log('\nTop 5 depts by value:');
 [...output.tx.byDept].sort((a, b) => b.value - a.value).slice(0, 5)
@@ -236,7 +246,7 @@ const sumCubePlusExcluded = sumCubeV + extras.cubeExcludedValue;
 const c7 = Math.abs(sumCubePlusExcluded - txTotalBase) <= TOL;
 // Sample cell reconcile: stip & dept sum to cell.v (stored in full).
 const sampleTheme = themes[0];
-const sample = cube.find((c) => c.t === sampleTheme) // first month of top theme
+const sample = cube.find((c) => c.t === sampleTheme) // first day of top theme
   || cube[0];
 let c8 = true, c9 = true;
 let sampleStipSum = 0, sampleDeptSum = 0;
@@ -256,9 +266,9 @@ console.log(`sum(byActivity.count)=${sumActivity} vs donors.total=${donorTotal} 
 console.log(`sum(byTier.count)=${sumTier} vs donors.total=${donorTotal} -> ${c4 ? 'OK' : 'MISMATCH'}`);
 console.log(`sum(tx.byPostcode.value)=€${fmt(round2(sumTxPc))} + suppressed=€${fmt(round2(txSupp.value))} = €${fmt(round2(sumTxPcAll))} vs validPostcodeTxValue=€${fmt(extras.validPostcodeTxValue)} -> ${c5 ? 'OK' : 'MISMATCH'}`);
 console.log(`donors.byPostcode bucketing: published=${sumDonorPc} + suppressed=${donorSupp.count} = ${sumDonorPcAll} -> ${c6 ? 'OK' : 'MISMATCH'}`);
-console.log(`sum(cube.v)=€${fmt(round2(sumCubeV))} + excluded(invalid-month)=€${fmt(round2(extras.cubeExcludedValue))} = €${fmt(round2(sumCubePlusExcluded))} vs txTotalBase=€${fmt(txTotalBase)} -> ${c7 ? 'OK' : 'MISMATCH'}`);
+console.log(`sum(cube.v)=€${fmt(round2(sumCubeV))} + excluded(invalid-date)=€${fmt(round2(extras.cubeExcludedValue))} = €${fmt(round2(sumCubePlusExcluded))} vs txTotalBase=€${fmt(txTotalBase)} -> ${c7 ? 'OK' : 'MISMATCH'}`);
 if (sample) {
-  console.log(`sample cell [${sample.m} / ${sample.t}]: v=€${fmt(sample.v)} count=${sample.c}`);
+  console.log(`sample cell [${sample.d} / ${sample.t}]: v=€${fmt(sample.v)} count=${sample.c}`);
   console.log(`  sum(stip)=€${fmt(round2(sampleStipSum))} vs v=€${fmt(sample.v)} -> ${c8 ? 'OK' : 'MISMATCH'}`);
   console.log(`  sum(dept)=€${fmt(round2(sampleDeptSum))} (<= v, remainder = non-FR) -> ${c9 ? 'OK' : 'MISMATCH'}`);
   console.log(`  stip entries=${sample.stip.length} pay=${sample.pay.length} dest=${sample.dest.length} city(top30)=${sample.city.length} dept=${sample.dept.length}`);

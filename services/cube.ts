@@ -36,6 +36,24 @@ export function monthsInRange(all: string[], start: string, end: string): string
   return all.filter((m) => m >= lo && m <= hi);
 }
 
+/**
+ * Normalize a range bound to a full ISO date "YYYY-MM-DD".
+ * Accepts either a full date (returned as-is) or a month "YYYY-MM"; for a month
+ * the `start` edge maps to the 1st and the `end` edge to the last day so that a
+ * month-granular UI range still selects the whole calendar month of day cells.
+ */
+function normalizeBound(v: string, edge: 'start' | 'end'): string {
+  if (!v) return v;
+  if (v.length >= 10) return v.slice(0, 10);        // already "YYYY-MM-DD"
+  if (v.length === 7) {                              // "YYYY-MM"
+    if (edge === 'start') return `${v}-01`;
+    const [y, m] = v.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate(); // day 0 of next month
+    return `${v}-${String(lastDay).padStart(2, '0')}`;
+  }
+  return v;
+}
+
 // ---- merge helpers: sum tuples by key, return rows sorted by value desc ----
 function mergeNamed(into: Map<string, NamedRow>, name: string, value: number, count: number) {
   const r = into.get(name);
@@ -47,9 +65,12 @@ function sortedNamed(m: Map<string, NamedRow>): NamedRow[] {
 }
 
 /**
- * Slice the cube to cells with start<=m<=end (and t===theme when given) and
- * merge into chart-ready aggregates. byTheme is only meaningful when no theme
- * filter is applied (otherwise it has a single entry).
+ * Slice the cube to cells with start<=d<=end (and t===theme when given) and
+ * merge into chart-ready aggregates. `start`/`end` are full ISO dates
+ * ("YYYY-MM-DD"); month-only bounds ("YYYY-MM") are accepted and expanded to
+ * the first/last day of that month. byTheme is only meaningful when no theme
+ * filter is applied (otherwise it has a single entry). byMonth is derived by
+ * grouping the in-range day cells by month ("YYYY-MM").
  */
 export function sliceCube(
   data: DonverseData,
@@ -66,11 +87,13 @@ export function sliceCube(
   const cube = data.cube;
   if (!cube || cube.length === 0) return empty;
 
-  const lo = range.start <= range.end ? range.start : range.end;
-  const hi = range.start <= range.end ? range.end : range.start;
+  const a = normalizeBound(range.start, 'start');
+  const b = normalizeBound(range.end, 'end');
+  const lo = a <= b ? a : b;
+  const hi = a <= b ? b : a;
 
   const cells: CubeCell[] = cube.filter(
-    (c) => c.m >= lo && c.m <= hi && (theme ? c.t === theme : true),
+    (c) => c.d >= lo && c.d <= hi && (theme ? c.t === theme : true),
   );
   if (cells.length === 0) return empty;
 
@@ -93,9 +116,10 @@ export function sliceCube(
 
     mergeNamed(themeMap, c.t, c.v, c.c);
 
-    const mm = monthMap.get(c.m);
+    const month = c.d.slice(0, 7); // "YYYY-MM"
+    const mm = monthMap.get(month);
     if (mm) { mm.amount += c.v; mm.count += c.c; }
-    else monthMap.set(c.m, { month: c.m, amount: c.v, count: c.c });
+    else monthMap.set(month, { month, amount: c.v, count: c.c });
 
     for (const [name, value, cnt] of c.stip) {
       mergeNamed(stipMap, name, value, cnt);

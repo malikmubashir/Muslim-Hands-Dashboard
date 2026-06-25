@@ -14,7 +14,7 @@ export interface DonorRegionRow { name: string; count: number; active: number; l
 export interface TxPostcodeRow { postcode: string; value: number; count: number; }
 export interface DonorPostcodeRow { postcode: string; count: number; active: number; ltv: number; }
 
-// ---- Cube (month × theme) breakdowns (Phase 9a, schema "cube-v2") ----
+// ---- Cube (DAY × theme) breakdowns (Phase 9a; day-granular schema "cube-v3-day") ----
 // Per-cell breakdown tuples are stored as positional arrays to keep the JSON
 // compact. stip/pay/dest/dept are LOW cardinality and stored in FULL (exact);
 // city is HIGH cardinality and stored TOP 30 by value per cell.
@@ -25,7 +25,7 @@ export type CubeCity = [string, number, number];          // [city, value, count
 export type CubeDept = [string, number, number];          // [deptCode, value, count]
 
 export interface CubeCell {
-  m: string;        // month "YYYY-MM"
+  d: string;        // donation date "YYYY-MM-DD"
   t: string;        // theme
   v: number;        // amount (base) for this (month,theme)
   c: number;        // donation count
@@ -52,6 +52,8 @@ export interface DonverseData {
     donorRows: number;
     monthMin: string;
     monthMax: string;
+    dateMin?: string;  // earliest donation date "YYYY-MM-DD" present in the cube
+    dateMax?: string;  // latest donation date "YYYY-MM-DD" present in the cube
     note?: string;
     // Postcode small-cell suppression (Phase 7a).
     suppressMinDonors?: number;
@@ -83,10 +85,11 @@ export interface DonverseData {
     byPostcode?: DonorPostcodeRow[];
     postcodeSuppressed?: { count: number };
   };
-  // ---- Cube (month × theme) for drill-down + date-range filtering (Phase 9a) ----
-  months?: string[];                       // sorted "YYYY-MM" ascending
+  // ---- Cube (DAY × theme) for drill-down + date-range filtering (Phase 9a) ----
+  days?: string[];                         // sorted "YYYY-MM-DD" ascending (distinct donation days)
+  months?: string[];                       // sorted "YYYY-MM" ascending (kept for labels)
   themes?: string[];                       // theme names sorted by full-period total desc
-  cube?: CubeCell[];                       // one cell per (month, theme) that has data
+  cube?: CubeCell[];                       // one cell per (day, theme) that has data
   regionByDept?: Record<string, string>;   // dept code -> région name
   postcodeGlobal?: PostcodeGlobal;         // FULL period, suppressMinDonors=5 (heatmap)
 }

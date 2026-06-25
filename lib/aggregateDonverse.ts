@@ -64,7 +64,13 @@ const VALID_DEPTS = new Set(Object.keys(DEPT_TO_REGION));
 
 // ---- Normalization helpers ----
 const THEME_MAP: Record<string, string> = { 'Fonds general': 'Fonds général', 'Environement': 'Environnement' };
-const STIP_MAP: Record<string, string> = { 'Zakat El MAal': 'Zakat El Maal' };
+const STIP_MAP: Record<string, string> = {
+  'Zakat El MAal': 'Zakat El Maal',
+  // Merge the various "bank interest" spellings into a single "Intérêt" category.
+  'Intérêts bancaires': 'Intérêt',
+  'Interets bancaires': 'Intérêt',
+  'Intérêt bancaire': 'Intérêt',
+};
 
 function normTheme(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
@@ -130,6 +136,15 @@ function toMonth(d: any): string | null {
   const y = dt.getUTCFullYear();
   const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
+}
+function toDay(d: any): string | null {
+  if (d == null) return null;
+  const dt = d instanceof Date ? d : new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(dt.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 function yearOf(d: any): number | null {
   if (d == null) return null;
@@ -202,7 +217,7 @@ export function aggregateDonverseWithExtras(
   const byCountry = new Map<string, Slice>();
   const byPostcodeTx = new Map<string, { value: number; count: number }>();
 
-  // ---- Cube (month × theme) accumulators ----
+  // ---- Cube (DAY × theme) accumulators ----
   interface CubeAcc {
     v: number; c: number;
     stip: Map<string, Slice>;
@@ -211,10 +226,11 @@ export function aggregateDonverseWithExtras(
     city: Map<string, Slice>;
     dept: Map<string, Slice>;
   }
-  const cubeMap = new Map<string, CubeAcc>(); // key = `${month}${theme}`
+  const cubeMap = new Map<string, CubeAcc>(); // key = `${day}${theme}` (day = fixed 10 chars)
   const themeFullTotal = new Map<string, number>(); // theme -> full-period base total
-  const monthSet = new Set<string>();
-  let cubeExcludedValue = 0; // base amount on rows with invalid/unparseable month
+  const daySet = new Set<string>();   // distinct donation days "YYYY-MM-DD"
+  const monthSet = new Set<string>(); // distinct donation months "YYYY-MM" (kept for labels)
+  let cubeExcludedValue = 0; // base amount on rows with invalid/unparseable date
   let cubeExcludedCount = 0;
 
   let txTotalBase = 0;
@@ -223,6 +239,8 @@ export function aggregateDonverseWithExtras(
   let validPostcodeTxCount = 0;
   let monthMin: string | null = null;
   let monthMax: string | null = null;
+  let dayMin: string | null = null;
+  let dayMax: string | null = null;
 
   for (const r of txRows) {
     const amount = num(r['Donation Amount (Base)']);
@@ -236,6 +254,7 @@ export function aggregateDonverseWithExtras(
     const country = normSimple(r['Address Country']);
     const dept = deptFromPostal(r['Postal Code']);
     const month = toMonth(r['Date']);
+    const day = toDay(r['Date']);
     const postcode = normPostcode(r['Postal Code']);
     const city = normCity(r['Locality']);
 
@@ -267,15 +286,18 @@ export function aggregateDonverseWithExtras(
       if (monthMax === null || month > monthMax) monthMax = month;
     }
 
-    // ---- Cube (month × theme) ----
-    // Rows with an invalid/unparseable month are excluded from the cube
-    // (consistent with byMonth above), but counted in txTotalBase (which
-    // sums every row). Track the excluded amount for transparent reconcile.
+    // ---- Cube (DAY × theme) ----
+    // Rows with an invalid/unparseable date are excluded from the cube, but
+    // counted in txTotalBase (which sums every row). Track the excluded amount
+    // for transparent reconcile.
     themeFullTotal.set(theme, (themeFullTotal.get(theme) || 0) + amount);
-    if (month) {
-      monthSet.add(month);
-      // month is always exactly 7 chars ("YYYY-MM"); split at fixed pos 7.
-      const key = month + theme;
+    if (day) {
+      daySet.add(day);
+      if (month) monthSet.add(month);
+      if (dayMin === null || day < dayMin) dayMin = day;
+      if (dayMax === null || day > dayMax) dayMax = day;
+      // day is always exactly 10 chars ("YYYY-MM-DD"); split at fixed pos 10.
+      const key = day + theme;
       let cell = cubeMap.get(key);
       if (!cell) {
         cell = {
@@ -398,7 +420,8 @@ export function aggregateDonverseWithExtras(
   const dByRegionArr = [...dByRegion.entries()].map(([name, e]) => ({ name, count: e.count, active: e.active, ltv: round2(e.ltv) }))
     .sort((a, b) => b.count - a.count);
 
-  // ================= ASSEMBLE CUBE (month × theme) =================
+  // ================= ASSEMBLE CUBE (DAY × theme) =================
+  const days = [...daySet].sort((a, b) => a.localeCompare(b));
   const months = [...monthSet].sort((a, b) => a.localeCompare(b));
   const themes = [...themeFullTotal.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -413,10 +436,10 @@ export function aggregateDonverseWithExtras(
       .sort((a, b) => b[1] - a[1]);
 
   const cube = [...cubeMap.entries()].map(([key, cell]) => {
-    const m = key.slice(0, 7);   // "YYYY-MM"
-    const t = key.slice(7);      // theme
+    const d = key.slice(0, 10);  // "YYYY-MM-DD"
+    const t = key.slice(10);     // theme
     return {
-      m, t,
+      d, t,
       v: round2(cell.v),
       c: cell.c,
       stip: stipArr(cell.stip),
@@ -426,7 +449,7 @@ export function aggregateDonverseWithExtras(
       city: stipArr(cell.city).slice(0, 30),
       dept: stipArr(cell.dept),
     };
-  }).sort((a, b) => (a.m === b.m ? a.t.localeCompare(b.t) : a.m.localeCompare(b.m)));
+  }).sort((a, b) => (a.d === b.d ? a.t.localeCompare(b.t) : a.d.localeCompare(b.d)));
 
   // regionByDept: only the dept codes that actually appear in tx data.
   const regionByDept: Record<string, string> = {};
@@ -449,10 +472,12 @@ export function aggregateDonverseWithExtras(
       donorRows: donorRows.length,
       monthMin: monthMin as string,
       monthMax: monthMax as string,
+      dateMin: (dayMin ?? '') as string,
+      dateMax: (dayMax ?? '') as string,
       note: 'Region names match regions.geojson `nom` exactly (13 metropolitan regions). DOM departments (971-976) and their regions appear in the data slices for completeness but have NO polygon in the metropolitan france-geojson, so they will not render on the choropleth map.',
       suppressMinDonors,
       postcodesSuppressed,
-      schema: 'cube-v2',
+      schema: 'cube-v3-day',
     },
     tx: {
       byDept: txByDept,
@@ -478,6 +503,7 @@ export function aggregateDonverseWithExtras(
       byPostcode: donorsByPostcode,
       postcodeSuppressed: { count: donorSuppCount },
     },
+    days,
     months,
     themes,
     cube,
