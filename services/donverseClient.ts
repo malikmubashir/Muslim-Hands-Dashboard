@@ -52,14 +52,24 @@ export async function loadDataset(): Promise<LoadedDataset> {
 
 /** Upload an anonymized DonverseData payload. Throws with a French message. */
 export async function uploadDataset(data: DonverseData): Promise<{ lastUpdated: string }> {
-  const res = await fetch('/api/data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  const json = await res.json().catch(() => ({}));
+  let res: Response;
+  try {
+    res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (e: any) {
+    throw new Error('Connexion au serveur impossible (réseau). ' + (e?.message || ''));
+  }
+  // Read as text first so non-JSON error pages (e.g. a 413/500 from the host)
+  // still surface a useful message instead of a generic failure.
+  const raw = await res.text();
+  let json: any = {};
+  try { json = raw ? JSON.parse(raw) : {}; } catch { /* server returned non-JSON */ }
   if (!res.ok || json.ok === false) {
-    throw new Error(json.error || `Échec de l’envoi (HTTP ${res.status}).`);
+    const detail = json.error || (raw ? raw.slice(0, 180) : '');
+    throw new Error(`Échec de l’envoi (HTTP ${res.status}). ${detail}`.trim());
   }
   return { lastUpdated: json.lastUpdated || '' };
 }
