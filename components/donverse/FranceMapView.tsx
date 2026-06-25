@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
-import { MapPin, RotateCcw } from 'lucide-react';
+import { MapPin, RotateCcw, Search } from 'lucide-react';
 import { DonverseData } from './types';
 import { DonCard, SectionTitle } from './DonCard';
 import { fmtEur, fmtEur2, fmtNum } from './format';
@@ -58,6 +58,13 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
   const layerRef = useRef<L.GeoJSON | null>(null);
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
   const fittedRef = useRef<Granularity | null>(null);
+  // Postcode search (postcode mode only).
+  const searchMarkerRef = useRef<L.CircleMarker | null>(null);
+  const [pcQuery, setPcQuery] = useState('');
+  const [pcResult, setPcResult] = useState<
+    { postcode: string; value: number; count: number } | null
+  >(null);
+  const [pcError, setPcError] = useState<string | null>(null);
 
   // Consolidated area index for the current granularity (range-filtered when cube present).
   const areaIndex = useMemo(() => buildAreaIndex(data, gran, range), [data, gran, range]);
@@ -244,6 +251,64 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
     }
   }, [gran, heatPoints]);
 
+  // ---- Postcode search: locate a postcode, show its global stats + map marker ----
+  const removeSearchMarker = () => {
+    if (searchMarkerRef.current) {
+      searchMarkerRef.current.remove();
+      searchMarkerRef.current = null;
+    }
+  };
+
+  const runPostcodeSearch = () => {
+    const q = pcQuery.trim();
+    const map = mapRef.current;
+    setPcResult(null);
+    setPcError(null);
+    removeSearchMarker();
+    if (!/^\d{5}$/.test(q)) {
+      setPcError('Entrez un code postal à 5 chiffres (ex. 75011).');
+      return;
+    }
+    const row = (data.postcodeGlobal?.byPostcode ?? []).find((r) => r.postcode === q);
+    if (!row) {
+      setPcError('Aucune donnée pour ce code postal (moins de 5 donateurs, ou code absent des dons).');
+      return;
+    }
+    setPcResult({ postcode: row.postcode, value: row.value, count: row.count });
+
+    // Locate on the map if we have a centroid.
+    const c = centroids?.[q];
+    if (map && c) {
+      map.setView([c[0], c[1]], 11);
+      const marker = L.circleMarker([c[0], c[1]], {
+        radius: 12,
+        color: '#15677A',
+        weight: 2,
+        fillColor: '#28B8D8',
+        fillOpacity: 0.85,
+      });
+      marker.bindPopup(
+        `<strong>${q}</strong><br/>Montant collecté : ${fmtEur(row.value)}<br/>Nombre de dons : ${fmtNum(row.count)}`,
+      );
+      marker.addTo(map);
+      marker.openPopup();
+      searchMarkerRef.current = marker;
+    }
+  };
+
+  // Clear search state + marker when leaving postcode mode.
+  useEffect(() => {
+    if (gran !== 'postcode') {
+      removeSearchMarker();
+      setPcQuery('');
+      setPcResult(null);
+      setPcError(null);
+    }
+  }, [gran]);
+
+  // Clean up the search marker on unmount.
+  useEffect(() => () => removeSearchMarker(), []);
+
   // ---- Top 10 ranking for the current metric (polygon areas only: exclude DOM codes) ----
   const domCodes = new Set(DOM.map((d) => d.code));
   const top10 = useMemo(() => {
@@ -332,6 +397,30 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
         )}
       </div>
 
+      {/* Postcode search (postcode mode only) */}
+      {gran === 'postcode' && (
+        <form
+          onSubmit={(e) => { e.preventDefault(); runPostcodeSearch(); }}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <input
+            type="text"
+            inputMode="numeric"
+            value={pcQuery}
+            onChange={(e) => setPcQuery(e.target.value)}
+            placeholder="Code postal (ex. 75011)"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-48"
+          />
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <Search size={14} /> Rechercher
+          </button>
+          <span className="text-xs text-gray-400">Statistiques sur l’année complète.</span>
+        </form>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Map + legend */}
         <div className="lg:col-span-2 space-y-4">
@@ -379,6 +468,35 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
 
         {/* Side column */}
         <div className="space-y-4">
+          {/* Postcode search result (postcode mode only) */}
+          {gran === 'postcode' && (pcResult || pcError) && (
+            <DonCard>
+              <div className="flex items-center gap-2 mb-3">
+                <Search size={16} className="text-emerald-600" />
+                <h3 className="text-sm font-semibold text-gray-800">
+                  {pcResult ? `Code postal ${pcResult.postcode}` : 'Recherche par code postal'}
+                </h3>
+              </div>
+              {pcResult ? (
+                <>
+                  <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                    <div>
+                      <dt className="text-gray-400 text-xs">Montant collecté</dt>
+                      <dd className="font-semibold text-gray-900">{fmtEur(pcResult.value)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-gray-400 text-xs">Nombre de dons</dt>
+                      <dd className="font-semibold text-gray-900">{fmtNum(pcResult.count)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-3 text-xs text-gray-400">Statistiques sur l’année complète.</p>
+                </>
+              ) : (
+                <p className="text-sm text-amber-600">{pcError}</p>
+              )}
+            </DonCard>
+          )}
+
           {/* Detail panel */}
           <DonCard>
             <div className="flex items-center gap-2 mb-3">

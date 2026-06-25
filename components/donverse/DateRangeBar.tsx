@@ -1,43 +1,62 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { CalendarRange } from 'lucide-react';
-import { fmtMonth } from './format';
+import { fmtDate } from './format';
 
 export interface DateRange { start: string; end: string; }
 
 interface DateRangeBarProps {
-  months: string[];                 // ascending "YYYY-MM"
-  range: DateRange;
+  /** Full available bounds from the cube, "YYYY-MM-DD". */
+  dateMin: string;
+  dateMax: string;
+  range: DateRange;                       // current selection, "YYYY-MM-DD"
   onChange: (r: DateRange) => void;
 }
 
+// Add `days` to an ISO date "YYYY-MM-DD", clamped to bounds by the caller.
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+const maxISO = (a: string, b: string) => (a >= b ? a : b);
+const minISO = (a: string, b: string) => (a <= b ? a : b);
+
 /**
- * Compact global date-range toolbar: Du / Au month selects + quick presets.
- * Guards start <= end. Month strings are ISO ("YYYY-MM"); labels are FR.
+ * Compact global date-range toolbar with day-precision calendar pickers.
+ * Two native <input type="date"> controls (Du / Au) bounded by dateMin/dateMax,
+ * plus quick presets. Guards start <= end (clamps the other edge if violated).
  */
-export const DateRangeBar: React.FC<DateRangeBarProps> = ({ months, range, onChange }) => {
-  const first = months[0];
-  const last = months[months.length - 1];
+export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, range, onChange }) => {
+  // Clamp a value into [dateMin, dateMax].
+  const clamp = (v: string) => minISO(maxISO(v, dateMin), dateMax);
 
-  // 3 last months available in the dataset.
-  const last3 = useMemo(() => months.slice(Math.max(0, months.length - 3)), [months]);
-  // Months belonging to 2025.
-  const months2025 = useMemo(() => months.filter((m) => m.startsWith('2025')), [months]);
-
-  const setStart = (start: string) => {
+  const setStart = (raw: string) => {
+    if (!raw) return;
+    const start = clamp(raw);
     const end = start > range.end ? start : range.end; // keep start <= end
     onChange({ start, end });
   };
-  const setEnd = (end: string) => {
+  const setEnd = (raw: string) => {
+    if (!raw) return;
+    const end = clamp(raw);
     const start = end < range.start ? end : range.start;
     onChange({ start, end });
   };
 
-  const presetActive = (s: string, e: string) => range.start === s && range.end === e;
+  // Presets, in day terms.
+  const presetAll = { start: dateMin, end: dateMax };
+  const preset2025 = { start: maxISO('2025-01-01', dateMin), end: minISO('2025-12-31', dateMax) };
+  const preset3m = { start: maxISO(addDaysISO(dateMax, -90), dateMin), end: dateMax };
+
+  const presetActive = (p: DateRange) => range.start === p.start && range.end === p.end;
 
   const presetBtn =
     'px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ';
   const presetOn = 'bg-emerald-600 text-white border-emerald-600';
   const presetOff = 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50';
+  const inputCls =
+    'text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -48,59 +67,55 @@ export const DateRangeBar: React.FC<DateRangeBarProps> = ({ months, range, onCha
 
       <div className="flex items-center gap-2">
         <label className="text-xs text-gray-500">Du</label>
-        <select
+        <input
+          type="date"
           value={range.start}
+          min={dateMin}
+          max={dateMax}
           onChange={(e) => setStart(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>{fmtMonth(m)}</option>
-          ))}
-        </select>
+          className={inputCls}
+        />
         <label className="text-xs text-gray-500">Au</label>
-        <select
+        <input
+          type="date"
           value={range.end}
+          min={dateMin}
+          max={dateMax}
           onChange={(e) => setEnd(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>{fmtMonth(m)}</option>
-          ))}
-        </select>
+          className={inputCls}
+        />
       </div>
 
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          onClick={() => onChange({ start: first, end: last })}
-          className={presetBtn + (presetActive(first, last) ? presetOn : presetOff)}
+          onClick={() => onChange(presetAll)}
+          className={presetBtn + (presetActive(presetAll) ? presetOn : presetOff)}
         >
           Toute la période
         </button>
-        {months2025.length > 0 && (
+        {preset2025.start <= preset2025.end && (
           <button
             type="button"
-            onClick={() => onChange({ start: months2025[0], end: months2025[months2025.length - 1] })}
-            className={presetBtn + (presetActive(months2025[0], months2025[months2025.length - 1]) ? presetOn : presetOff)}
+            onClick={() => onChange(preset2025)}
+            className={presetBtn + (presetActive(preset2025) ? presetOn : presetOff)}
           >
             2025
           </button>
         )}
-        {last3.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onChange({ start: last3[0], end: last3[last3.length - 1] })}
-            className={presetBtn + (presetActive(last3[0], last3[last3.length - 1]) ? presetOn : presetOff)}
-          >
-            3 derniers mois
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => onChange(preset3m)}
+          className={presetBtn + (presetActive(preset3m) ? presetOn : presetOff)}
+        >
+          3 derniers mois
+        </button>
       </div>
 
       <div className="ml-auto text-xs text-gray-500">
-        <span className="font-medium text-gray-700">{fmtMonth(range.start)}</span>
+        <span className="font-medium text-gray-700">{fmtDate(range.start)}</span>
         {' → '}
-        <span className="font-medium text-gray-700">{fmtMonth(range.end)}</span>
+        <span className="font-medium text-gray-700">{fmtDate(range.end)}</span>
       </div>
     </div>
   );

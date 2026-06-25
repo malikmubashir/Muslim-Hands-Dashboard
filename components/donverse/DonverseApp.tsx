@@ -36,10 +36,17 @@ const DonverseApp: React.FC = () => {
       .then((res) => {
         setData(res.data);
         setMeta({ source: res.source, lastUpdated: res.lastUpdated });
-        // Default the date range to the full available period.
-        const months = res.data.months || [];
-        if (months.length) {
-          setRange({ start: months[0], end: months[months.length - 1] });
+        // Default the date range to the full available period (day-precision).
+        const dateMin = res.data.meta?.dateMin;
+        const dateMax = res.data.meta?.dateMax;
+        if (dateMin && dateMax) {
+          setRange({ start: dateMin, end: dateMax });
+        } else {
+          // Fallback for legacy datasets without day bounds: derive from months.
+          const months = res.data.months || [];
+          if (months.length) {
+            setRange({ start: `${months[0]}-01`, end: `${months[months.length - 1]}-28` });
+          }
         }
       })
       .catch((e: any) => {
@@ -69,6 +76,9 @@ const DonverseApp: React.FC = () => {
 
   const months = data?.months || [];
   const hasCube = !!(data?.cube && data.cube.length && months.length);
+  // Day-precision bounds for the calendar pickers (fallback to month-derived).
+  const dateMin = data?.meta?.dateMin || (months.length ? `${months[0]}-01` : '');
+  const dateMax = data?.meta?.dateMax || (months.length ? `${months[months.length - 1]}-28` : '');
 
   // Share of the selected theme over the whole range total (for drill-down KPI).
   const themeShare = useMemo(() => {
@@ -156,7 +166,7 @@ const DonverseApp: React.FC = () => {
           <div className="space-y-6">
             {/* Global date-range control — applies to Tableau de bord, Carte + drill-down */}
             {hasCube && (view === 'overview' || view === 'map') && (
-              <DateRangeBar months={months} range={range} onChange={setRange} />
+              <DateRangeBar dateMin={dateMin} dateMax={dateMax} range={range} onChange={setRange} />
             )}
 
             {view === 'overview' && (

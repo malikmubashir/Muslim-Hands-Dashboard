@@ -65,3 +65,12 @@ export const fmtMonthShort = (m: string) => {
   if (!y || isNaN(idx)) return m || '';
   return `${MONTH_NAMES[idx]} ${y.slice(2)}`;
 };
+
+// Friendly day label, e.g. "2024-12-31" -> "31 déc. 2024".
+export const fmtDate = (d: string) => {
+  const [y, mm, dd] = (d || '').split('-');
+  const idx = parseInt(mm, 10) - 1;
+  const day = parseInt(dd, 10);
+  if (!y || isNaN(idx) || isNaN(day)) return d || '';
+  return `${day} ${MONTH_NAMES[idx]} ${y}`;
+};
