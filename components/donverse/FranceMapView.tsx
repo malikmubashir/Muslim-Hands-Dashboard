@@ -9,8 +9,9 @@ import { fmtEur, fmtEur2, fmtNum } from './format';
 import {
   Granularity, MetricKey, METRICS, AreaRow,
   buildAreaIndex, metricValue, quantileBreaks, colorFor,
-  GREEN_RAMP, NO_DATA, DOM,
+  GREEN_RAMP, NO_DATA, DOM, normCity,
 } from './mapMetrics';
+import { sliceCube } from '../../services/cube';
 
 const fmtMetric = (v: number, m: MetricKey): string =>
   m === 'amount' ? fmtEur(v) : m === 'avg' ? fmtEur2(v) : fmtNum(v);
@@ -52,19 +53,25 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
   const [selected, setSelected] = useState<AreaRow | null>(null);
   // Lazily-loaded postcode -> [lat, lng] centroid map.
   const [centroids, setCentroids] = useState<Record<string, [number, number]> | null>(null);
+  // Lazily-loaded normalized-city -> [lat, lng] centroid map (cities-fr.json).
+  const [cityCentroids, setCityCentroids] = useState<Record<string, [number, number]> | null>(null);
 
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
   const heatLayerRef = useRef<L.HeatLayer | null>(null);
   const fittedRef = useRef<Granularity | null>(null);
-  // Postcode search (postcode mode only).
+  // Search (postcode mode only) — accepts a postcode OR a city name.
   const searchMarkerRef = useRef<L.CircleMarker | null>(null);
   const [pcQuery, setPcQuery] = useState('');
   const [pcResult, setPcResult] = useState<
     { postcode: string; value: number; count: number } | null
   >(null);
   const [pcError, setPcError] = useState<string | null>(null);
+  // City search result (date-filtered). `located` = whether a centroid was found.
+  const [cityResult, setCityResult] = useState<
+    { name: string; value: number; count: number; located: boolean } | null
+  >(null);
 
   // Consolidated area index for the current granularity (range-filtered when cube present).
   const areaIndex = useMemo(() => buildAreaIndex(data, gran, range), [data, gran, range]);
@@ -102,6 +109,17 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
       .catch((e) => console.error('postcode centroids load failed', e));
     return () => { cancelled = true; };
   }, [gran, centroids]);
+
+  // ---- Lazily load city centroids once when entering postcode mode ----
+  useEffect(() => {
+    if (gran !== 'postcode' || cityCentroids) return;
+    let cancelled = false;
+    fetch('geo/cities-fr.json')
+      .then((r) => r.json())
+      .then((json) => { if (!cancelled) setCityCentroids(json as Record<string, [number, number]>); })
+      .catch((e) => console.error('city centroids load failed', e));
+    return () => { cancelled = true; };
+  }, [gran, cityCentroids]);
 
   // ---- Init map once (guard against StrictMode double-init) ----
   useEffect(() => {
@@ -191,6 +209,24 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
     }
   }, [geo, gran, metric, areaIndex, breaks]);
 
+  // ---- Date-filtered city stats from the cube (postcode mode search + Top villes) ----
+  // sliceCube(range).byCity already merges per-cell TOP-30 cities over the range.
+  // We re-key by the canonical normCity() so name lookups are accent/case/
+  // arrondissement-insensitive. The display name keeps the first raw spelling seen.
+  const cityStats = useMemo(() => {
+    const m = new Map<string, { name: string; value: number; count: number }>();
+    if (!range || !data.cube || !data.cube.length) return m;
+    const byCity = sliceCube(data, range).byCity;
+    for (const c of byCity) {
+      const key = normCity(c.name);
+      if (!key) continue;
+      const r = m.get(key);
+      if (r) { r.value += c.value; r.count += c.count; }
+      else m.set(key, { name: c.name, value: c.value, count: c.count });
+    }
+    return m;
+  }, [data, range]);
+
   // ---- Postcode source rows: merge tx + donors keyed by postcode ----
   const postcodeRows = useMemo(() => {
     const txMap = new Map<string, { value: number; count: number }>();
@@ -259,40 +295,91 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
     }
   };
 
+  // Drop a turquoise marker at [lat,lng] with a popup; pan/zoom to it.
+  const dropMarker = (lat: number, lng: number, popupHtml: string, zoom = 11) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.setView([lat, lng], zoom);
+    const marker = L.circleMarker([lat, lng], {
+      radius: 12,
+      color: '#15677A',
+      weight: 2,
+      fillColor: '#28B8D8',
+      fillOpacity: 0.85,
+    });
+    marker.bindPopup(popupHtml);
+    marker.addTo(map);
+    marker.bringToFront();
+    marker.openPopup();
+    searchMarkerRef.current = marker;
+  };
+
+  // Locate + show a city's date-filtered stats. Used by the search box and by
+  // clicking a row in the "Top 10 villes" card.
+  const locateCity = (rawName: string) => {
+    setPcResult(null);
+    setPcError(null);
+    setCityResult(null);
+    removeSearchMarker();
+    const key = normCity(rawName);
+    const stats = cityStats.get(key);
+    if (!stats) {
+      setPcError('Aucune donnée pour cette ville sur la période.');
+      return;
+    }
+    const c = cityCentroids?.[key];
+    setCityResult({ name: stats.name, value: stats.value, count: stats.count, located: !!c });
+    if (c) {
+      dropMarker(
+        c[0], c[1],
+        `<strong>${stats.name}</strong><br/>Montant collecté : ${fmtEur(stats.value)}<br/>Nombre de dons : ${fmtNum(stats.count)}`,
+      );
+    }
+  };
+
+  // Search box: digits (5-char postcode / DOM) → postcode lookup; otherwise city.
   const runPostcodeSearch = () => {
     const q = pcQuery.trim();
     const map = mapRef.current;
     setPcResult(null);
     setPcError(null);
+    setCityResult(null);
     removeSearchMarker();
+    if (!q) return;
+
+    // City branch: anything that isn't a pure 5-digit code.
     if (!/^\d{5}$/.test(q)) {
-      setPcError('Entrez un code postal à 5 chiffres (ex. 75011).');
+      // Exact normalized match first, else startsWith on the canonical key.
+      const key = normCity(q);
+      let stats = cityStats.get(key);
+      if (!stats && key) {
+        const candidates = Array.from(cityStats.entries())
+          .filter(([k]) => k.startsWith(key))
+          .map(([, v]) => v)
+          .sort((a, b) => b.value - a.value);
+        stats = candidates[0];
+      }
+      if (!stats) {
+        setPcError('Aucune donnée pour cette ville sur la période.');
+        return;
+      }
+      locateCity(stats.name);
       return;
     }
+
+    // Postcode branch: full-period stats from postcodeGlobal.
     const row = (data.postcodeGlobal?.byPostcode ?? []).find((r) => r.postcode === q);
     if (!row) {
       setPcError('Aucune donnée pour ce code postal (moins de 5 donateurs, ou code absent des dons).');
       return;
     }
     setPcResult({ postcode: row.postcode, value: row.value, count: row.count });
-
-    // Locate on the map if we have a centroid.
     const c = centroids?.[q];
     if (map && c) {
-      map.setView([c[0], c[1]], 11);
-      const marker = L.circleMarker([c[0], c[1]], {
-        radius: 12,
-        color: '#15677A',
-        weight: 2,
-        fillColor: '#28B8D8',
-        fillOpacity: 0.85,
-      });
-      marker.bindPopup(
+      dropMarker(
+        c[0], c[1],
         `<strong>${q}</strong><br/>Montant collecté : ${fmtEur(row.value)}<br/>Nombre de dons : ${fmtNum(row.count)}`,
       );
-      marker.addTo(map);
-      marker.openPopup();
-      searchMarkerRef.current = marker;
     }
   };
 
@@ -303,6 +390,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
       setPcQuery('');
       setPcResult(null);
       setPcError(null);
+      setCityResult(null);
     }
   }, [gran]);
 
@@ -328,6 +416,14 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 10);
   }, [postcodeRows]);
+
+  // Top 10 villes (date-filtered) by amount — postcode mode only.
+  const top10Cities = useMemo(() => {
+    return Array.from(cityStats.values())
+      .filter((c) => c.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [cityStats]);
 
   // Legend ranges from quantile breaks.
   const legendRows = useMemo(() => {
@@ -405,11 +501,10 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
         >
           <input
             type="text"
-            inputMode="numeric"
             value={pcQuery}
             onChange={(e) => setPcQuery(e.target.value)}
-            placeholder="Code postal (ex. 75011)"
-            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-48"
+            placeholder="Code postal ou ville (ex. 75011 ou Marseille)"
+            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64"
           />
           <button
             type="submit"
@@ -417,7 +512,9 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
           >
             <Search size={14} /> Rechercher
           </button>
-          <span className="text-xs text-gray-400">Statistiques sur l’année complète.</span>
+          <span className="text-xs text-gray-400">
+            Code postal : année complète · Ville : période sélectionnée.
+          </span>
         </form>
       )}
 
@@ -468,13 +565,17 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
 
         {/* Side column */}
         <div className="space-y-4">
-          {/* Postcode search result (postcode mode only) */}
-          {gran === 'postcode' && (pcResult || pcError) && (
+          {/* Search result — postcode (full period) or city (selected period) */}
+          {gran === 'postcode' && (pcResult || cityResult || pcError) && (
             <DonCard>
               <div className="flex items-center gap-2 mb-3">
                 <Search size={16} className="text-emerald-600" />
                 <h3 className="text-sm font-semibold text-gray-800">
-                  {pcResult ? `Code postal ${pcResult.postcode}` : 'Recherche par code postal'}
+                  {pcResult
+                    ? `Code postal ${pcResult.postcode}`
+                    : cityResult
+                    ? `Ville : ${cityResult.name}`
+                    : 'Recherche'}
                 </h3>
               </div>
               {pcResult ? (
@@ -490,6 +591,24 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
                     </div>
                   </dl>
                   <p className="mt-3 text-xs text-gray-400">Statistiques sur l’année complète.</p>
+                </>
+              ) : cityResult ? (
+                <>
+                  <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                    <div>
+                      <dt className="text-gray-400 text-xs">Montant collecté</dt>
+                      <dd className="font-semibold text-gray-900">{fmtEur(cityResult.value)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-gray-400 text-xs">Nombre de dons</dt>
+                      <dd className="font-semibold text-gray-900">{fmtNum(cityResult.count)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-3 text-xs text-gray-400">
+                    {cityResult.located
+                      ? 'Statistiques sur la période sélectionnée.'
+                      : 'Statistiques sur la période sélectionnée · localisation indisponible.'}
+                  </p>
                 </>
               ) : (
                 <p className="text-sm text-amber-600">{pcError}</p>
@@ -546,6 +665,34 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
                   ))}
             </ol>
           </DonCard>
+
+          {/* Top 10 villes (postcode mode, date-filtered) */}
+          {gran === 'postcode' && (
+            <DonCard>
+              <SectionTitle sub="Montant collecté · période sélectionnée">
+                Top 10 villes
+              </SectionTitle>
+              {top10Cities.length ? (
+                <ol className="space-y-1.5">
+                  {top10Cities.map((c, i) => (
+                    <li key={c.name} className="flex items-center justify-between text-sm">
+                      <button
+                        type="button"
+                        onClick={() => locateCity(c.name)}
+                        className="flex items-center gap-2 min-w-0 text-left hover:text-emerald-700"
+                      >
+                        <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
+                        <span className="truncate text-gray-700">{c.name}</span>
+                      </button>
+                      <span className="font-semibold text-gray-900 tabular-nums">{fmtEur(c.value)}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-gray-400">Aucune ville sur la période sélectionnée.</p>
+              )}
+            </DonCard>
+          )}
 
           {/* DOM note */}
           <DonCard>

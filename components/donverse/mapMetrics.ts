@@ -117,6 +117,28 @@ export function colorFor(value: number, breaks: number[]): string {
   return GREEN_RAMP[Math.min(bucket, GREEN_RAMP.length - 1)];
 }
 
+// Canonical city key — MUST stay identical to normCity() in
+// scripts/build-cities.mjs so user input, the data's Locality, and the
+// cities-fr.json keys all collapse to the same string.
+// Steps: NFD accent-strip, uppercase, drop "(...)" suffix, hyphens/apostrophes
+// -> space, drop arrondissement suffix ("MARSEILLE 08", "LYON 1ER ARRONDISSEMENT"),
+// expand ST/STE -> SAINT/SAINTE, collapse whitespace, trim.
+export function normCity(s: string): string {
+  if (!s) return '';
+  let n = String(s)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents (combining diacritics)
+    .toUpperCase()
+    .replace(/\(.*$/, '') // drop "(...)" suffix and anything after it
+    .replace(/[-']/g, ' ') // hyphens/apostrophes -> space
+    .replace(/\s+/g, ' ')
+    .trim();
+  n = n.replace(/\s+\d+\s*(ER|EME|E)?\s*ARRONDISSEMENT$/, '');
+  n = n.replace(/\s+\d{1,2}$/, ''); // trailing arrondissement number
+  n = n.replace(/\bSTE\b/g, 'SAINTE').replace(/\bST\b/g, 'SAINT');
+  return n.replace(/\s+/g, ' ').trim();
+}
+
 // DOM codes that have data but no metropolitan polygon.
 export const DOM = [
   { code: '971', name: 'Guadeloupe' },
