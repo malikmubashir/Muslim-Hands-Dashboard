@@ -63,7 +63,32 @@ for (const [region, depts] of Object.entries(REGION_DEPTS)) {
 const VALID_DEPTS = new Set(Object.keys(DEPT_TO_REGION));
 
 // ---- Normalization helpers ----
-const THEME_MAP: Record<string, string> = { 'Fonds general': 'Fonds général', 'Environement': 'Environnement' };
+// Canonical theme map keyed by a normalized form (trim + collapse inner
+// whitespace + lowercase + strip accents). Merges accent/case/spelling variants
+// of "Fund Dimension 2" into a single canonical French label.
+const THEME_CANON: Record<string, string> = {
+  'orphelins': 'Orphelins',
+  'fonds general': 'Fonds général',
+  'eau potable': 'Eau potable',
+  'urgences': 'Urgences',
+  'aide alimentaire': 'Aide alimentaire',
+  'generation de revenus': 'Génération de revenus',
+  'generations de revenue': 'Génération de revenus',
+  'activites generatrices de revenus': 'Génération de revenus',
+  'sante': 'Santé',
+  'education': 'Éducation',
+  'environement': 'Environnement',
+  'environnement': 'Environnement',
+  'enfance': 'Enfance',
+};
+function themeKey(s: string): string {
+  return s
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
 const STIP_MAP: Record<string, string> = {
   'Zakat El MAal': 'Zakat El Maal',
   // Merge the various "bank interest" spellings into a single "Intérêt" category.
@@ -75,7 +100,9 @@ const STIP_MAP: Record<string, string> = {
 function normTheme(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
   if (t === '') return 'Non spécifié';
-  return THEME_MAP[t] || t;
+  // Map accent/case/spelling variants to a single canonical label; unknown
+  // themes fall back to the trimmed original.
+  return THEME_CANON[themeKey(t)] || t;
 }
 function normStip(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
@@ -227,11 +254,19 @@ export function aggregateDonverseWithExtras(
     dept: Map<string, Slice>;
   }
   const cubeMap = new Map<string, CubeAcc>(); // key = `${day}${theme}` (day = fixed 10 chars)
-  const themeFullTotal = new Map<string, number>(); // theme -> full-period base total
+  const themeFullTotal = new Map<string, number>(); // theme -> full-period allocation total
   const daySet = new Set<string>();   // distinct donation days "YYYY-MM-DD"
   const monthSet = new Set<string>(); // distinct donation months "YYYY-MM" (kept for labels)
-  let cubeExcludedValue = 0; // base amount on rows with invalid/unparseable date
+  let cubeExcludedValue = 0; // allocation amount on rows with invalid/unparseable date
   let cubeExcludedCount = 0;
+
+  // ---- Distinct-donation counting ----
+  // The export has one ROW per cause-allocation, so a single donation (one
+  // "Donation Reference") spans multiple rows. "Nombre de dons" must count
+  // distinct donations, not allocation rows. Track per-day sets of distinct
+  // references, plus a global set for the grand total.
+  const dailyRefSets = new Map<string, Set<string>>(); // "YYYY-MM-DD" -> set of refs
+  const allRefSet = new Set<string>();                  // all distinct refs
 
   let txTotalBase = 0;
   let nonFranceTotal = 0;
@@ -243,8 +278,14 @@ export function aggregateDonverseWithExtras(
   let dayMax: string | null = null;
 
   for (const r of txRows) {
-    const amount = num(r['Donation Amount (Base)']);
+    // Use the PER-ALLOCATION portion, not the full donation amount. The full
+    // "Donation Amount (Base)" is repeated on every split row, so summing it
+    // double-counts; "Allocation Amount (Base)" is the per-row portion and sums
+    // to the true total (~€8.05M).
+    const amount = num(r['Allocation Amount (Base)']);
     txTotalBase += amount;
+
+    const ref = (r['Donation Reference'] == null ? '' : String(r['Donation Reference'])).trim();
 
     const theme = normTheme(r['Fund Dimension 2']);
     const stip = normStip(r['Fund Dimension 3']);
@@ -294,6 +335,15 @@ export function aggregateDonverseWithExtras(
     if (day) {
       daySet.add(day);
       if (month) monthSet.add(month);
+      // Track distinct donation references for this day (and globally). A
+      // donation has exactly one date, so summing daily distinct counts over a
+      // range yields the correct donation count for that range.
+      if (ref !== '') {
+        allRefSet.add(ref);
+        let ds = dailyRefSets.get(day);
+        if (!ds) { ds = new Set<string>(); dailyRefSets.set(day, ds); }
+        ds.add(ref);
+      }
       if (dayMin === null || day < dayMin) dayMin = day;
       if (dayMax === null || day > dayMax) dayMax = day;
       // day is always exactly 10 chars ("YYYY-MM-DD"); split at fixed pos 10.
@@ -427,6 +477,10 @@ export function aggregateDonverseWithExtras(
     .sort((a, b) => b[1] - a[1])
     .map(([name]) => name);
 
+  // dailyDonations: date "YYYY-MM-DD" -> number of DISTINCT donations that day.
+  const dailyDonations: Record<string, number> = {};
+  for (const [d, set] of dailyRefSets.entries()) dailyDonations[d] = set.size;
+
   // Convert a Slice map to a sorted positional-tuple array (value desc).
   const stipArr = (m: Map<string, Slice>): [string, number, number][] =>
     [...m.entries()].map(([k, e]) => [k, round2(e.value), e.count] as [string, number, number])
@@ -469,6 +523,7 @@ export function aggregateDonverseWithExtras(
       currency: 'EUR',
       txRows: txRows.length,
       txTotalBase: round2(txTotalBase),
+      txDonationCount: allRefSet.size,
       donorRows: donorRows.length,
       monthMin: monthMin as string,
       monthMax: monthMax as string,
@@ -506,6 +561,7 @@ export function aggregateDonverseWithExtras(
     days,
     months,
     themes,
+    dailyDonations,
     cube,
     regionByDept,
     postcodeGlobal,

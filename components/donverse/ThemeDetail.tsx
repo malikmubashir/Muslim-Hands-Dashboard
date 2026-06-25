@@ -63,7 +63,7 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard icon={Euro} label="Total collecté" value={fmtEur(s.total)} accent={paletteAt(0)} />
         <KpiCard icon={Receipt} label="Nombre de dons" value={fmtNum(s.count)} accent={paletteAt(1)} />
-        <KpiCard icon={TrendingUp} label="Don moyen" value={fmtEur2(s.avg)} accent={paletteAt(2)} />
+        <KpiCard icon={TrendingUp} label="Don moyen" value={fmtEur2(s.count ? s.total / s.count : 0)} accent={paletteAt(2)} />
         <KpiCard icon={Percent} label="% du total collecté" value={fmtPct(shareOfTotal * 100)} accent={paletteAt(3)} />
         <KpiCard
           icon={CalendarCheck}

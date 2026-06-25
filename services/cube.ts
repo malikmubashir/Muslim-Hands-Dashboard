@@ -12,7 +12,8 @@ export interface MonthRow { month: string; amount: number; count: number; }
 
 export interface CubeSlice {
   total: number;
-  count: number;
+  count: number;          // allocation-row count (cube cell `c` sum)
+  donationCount: number;  // distinct DONATION count in range (sum of dailyDonations)
   avg: number;
   byTheme: NamedRow[];
   byStipulation: NamedRow[];
@@ -78,7 +79,7 @@ export function sliceCube(
   theme?: string,
 ): CubeSlice {
   const empty: CubeSlice = {
-    total: 0, count: 0, avg: 0,
+    total: 0, count: 0, donationCount: 0, avg: 0,
     byTheme: [], byStipulation: [], byPayment: [], byDestination: [],
     byCity: [], byDept: [], byRegion: [], byMonth: [],
     paShare: 0, zakatShare: 0, topCity: null, topDestination: null, bestMonth: null,
@@ -162,10 +163,22 @@ export function sliceCube(
     null,
   );
 
+  // Distinct-donation count over the selected range: sum dailyDonations[d] for
+  // days d in [lo,hi]. Each donation has one date, so this is exact. "Don
+  // moyen" uses total / donationCount (NOT the allocation-row count).
+  let donationCount = 0;
+  const daily = data.dailyDonations;
+  if (daily) {
+    for (const d in daily) {
+      if (d >= lo && d <= hi) donationCount += daily[d];
+    }
+  }
+
   return {
     total,
     count,
-    avg: count ? total / count : 0,
+    donationCount,
+    avg: donationCount ? total / donationCount : 0,
     byTheme,
     byStipulation,
     byPayment,

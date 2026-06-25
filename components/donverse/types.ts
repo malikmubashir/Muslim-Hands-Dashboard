@@ -49,6 +49,7 @@ export interface DonverseData {
     currency: string;
     txRows: number;
     txTotalBase: number;
+    txDonationCount?: number; // distinct "Donation Reference" count (true # of donations)
     donorRows: number;
     monthMin: string;
     monthMax: string;
@@ -89,6 +90,7 @@ export interface DonverseData {
   days?: string[];                         // sorted "YYYY-MM-DD" ascending (distinct donation days)
   months?: string[];                       // sorted "YYYY-MM" ascending (kept for labels)
   themes?: string[];                       // theme names sorted by full-period total desc
+  dailyDonations?: Record<string, number>; // "YYYY-MM-DD" -> distinct donation count that day
   cube?: CubeCell[];                       // one cell per (day, theme) that has data
   regionByDept?: Record<string, string>;   // dept code -> région name
   postcodeGlobal?: PostcodeGlobal;         // FULL period, suppressMinDonors=5 (heatmap)

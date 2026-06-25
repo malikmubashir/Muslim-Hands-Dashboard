@@ -36,7 +36,7 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
       {/* KPI row — range-aware */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={Euro} label="Total collecté" value={fmtEur(s.total)} hint={`${fmtMonth(range.start)} → ${fmtMonth(range.end)}`} accent={paletteAt(0)} />
-        <KpiCard icon={Receipt} label="Nombre de dons" value={fmtNum(s.count)} accent={paletteAt(1)} />
+        <KpiCard icon={Receipt} label="Nombre de dons" value={fmtNum(s.donationCount)} accent={paletteAt(1)} />
         <KpiCard icon={TrendingUp} label="Don moyen" value={fmtEur2(s.avg)} accent={paletteAt(2)} />
         <KpiCard icon={CreditCard} label="Part prélèvements (PA)" value={fmtPct(s.paShare * 100)} accent={paletteAt(3)} />
         <KpiCard icon={HandHeart} label="Part Zakat" value={fmtPct(s.zakatShare * 100)} accent={paletteAt(4)} />

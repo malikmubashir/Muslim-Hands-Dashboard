@@ -165,6 +165,7 @@ const nonFranceTotal = extras.nonFranceTotal;
 console.log('\n========== SUMMARY ==========');
 console.log('txRows:', output.meta.txRows);
 console.log('txTotalBase: €' + fmt(txTotalBase));
+console.log('txDonationCount (distinct refs):', output.meta.txDonationCount);
 console.log('donorRows:', output.meta.donorRows, '| donors.total:', donorTotal, '| totalLtv: €' + fmt(donorLtv));
 console.log('#depts (tx):', output.tx.byDept.length, '| #regions (tx):', output.tx.byRegion.length);
 console.log('monthMin:', output.meta.monthMin, 'monthMax:', output.meta.monthMax);
@@ -197,8 +198,8 @@ console.log(`  "Intérêt" total: €${fmt(interet ? interet.value : 0)} (${inte
 console.log('\nTop 5 depts by value:');
 [...output.tx.byDept].sort((a, b) => b.value - a.value).slice(0, 5)
   .forEach(d => console.log('  ', d.code, '€' + fmt(d.value), '(' + d.count + ')'));
-console.log('\nTop 5 themes:');
-output.tx.byTheme.slice(0, 5).forEach(t => console.log('  ', t.name, '€' + fmt(t.value), '(' + t.count + ')'));
+console.log('\nThemes list (deduped, full period):');
+output.tx.byTheme.forEach(t => console.log('  ', t.name, '€' + fmt(t.value), '(' + t.count + ' alloc rows)'));
 console.log('\nPayment families:');
 output.tx.byPayment.forEach(p => console.log('  ', p.name, '€' + fmt(p.value), '(' + p.count + ')', p.isPA ? '[PA]' : ''));
 console.log('\nDonor activity:');
