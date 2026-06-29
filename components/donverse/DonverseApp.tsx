@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Map as MapIcon, Users, Loader2, AlertTriangle,
-  RefreshCw, CheckCircle2, LucideIcon, Info,
+  RefreshCw, CheckCircle2, LucideIcon, Info, Contact,
 } from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
+import { ExtractionView } from './ExtractionView';
 import { ThemeDetail } from './ThemeDetail';
 import { DateRangeBar, DateRange } from './DateRangeBar';
 import UpdateDataModal from './UpdateDataModal';
@@ -17,6 +18,7 @@ const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
   { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
   { key: 'map', label: 'Carte de France', icon: MapIcon },
   { key: 'donors', label: 'Donateurs', icon: Users },
+  { key: 'extraction', label: 'Extraction', icon: Contact },
 ];
 
 const DonverseApp: React.FC = () => {
@@ -197,6 +199,9 @@ const DonverseApp: React.FC = () => {
                 </div>
                 <DonorsView data={data} />
               </>
+            )}
+            {view === 'extraction' && (
+              <ExtractionView />
             )}
           </div>
         )}

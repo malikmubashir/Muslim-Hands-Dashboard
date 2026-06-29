@@ -96,4 +96,4 @@ export interface DonverseData {
   postcodeGlobal?: PostcodeGlobal;         // FULL period, suppressMinDonors=5 (heatmap)
 }
 
-export type DonverseView = 'overview' | 'map' | 'donors';
+export type DonverseView = 'overview' | 'map' | 'donors' | 'extraction';
