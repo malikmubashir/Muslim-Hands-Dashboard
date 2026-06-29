@@ -3,13 +3,19 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Users, Activity, ShieldCheck, Wallet } from 'lucide-react';
+import { Users, Activity, ShieldCheck, Wallet, Download } from 'lucide-react';
 import { DonverseData } from './types';
 import { KpiCard } from './KpiCard';
 import { DonCard, SectionTitle } from './DonCard';
+import { CategoryDownloadBar } from './CategoryDownloadBar';
+import type { ExtractionFilters } from '../../lib/extractionExport';
 import { fmtEur, fmtNum, fmtPct, MH, PALETTE } from './format';
 
-export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
+export const DonorsView: React.FC<{
+  data: DonverseData;
+  /** Download donors for a segment (full base, all-time). */
+  onExtract?: (seed: Partial<ExtractionFilters>) => void;
+}> = ({ data, onExtract }) => {
   const d = data.donors;
 
   const totalActivity = d.byActivity.reduce((s, r) => s + r.count, 0);
@@ -52,6 +58,7 @@ export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par activité" items={d.byActivity} onPick={(name) => onExtract({ activite: [name] })} />}
         </DonCard>
 
         {/* Tier */}
@@ -70,6 +77,7 @@ export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par palier" items={d.byTier} onPick={(name) => onExtract({ palier: [name] })} />}
         </DonCard>
       </div>
 
@@ -88,6 +96,7 @@ export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par type" items={d.byType} onPick={(name) => onExtract({ type: [name] })} />}
         </DonCard>
 
         {/* Consent donut */}
@@ -104,6 +113,7 @@ export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par consentement (courrier)" items={d.byConsent} onPick={(name) => onExtract({ pcat: [name] })} />}
         </DonCard>
 
         {/* Top regions list */}
@@ -111,12 +121,24 @@ export const DonorsView: React.FC<{ data: DonverseData }> = ({ data }) => {
           <SectionTitle sub="Par nombre de donateurs">Top 10 régions</SectionTitle>
           <ol className="space-y-1.5">
             {topRegions.map((r, i) => (
-              <li key={r.name} className="flex items-center justify-between text-sm">
+              <li key={r.name} className="flex items-center justify-between gap-2 text-sm">
                 <span className="flex items-center gap-2 min-w-0">
                   <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
                   <span className="truncate text-gray-700">{r.name}</span>
                 </span>
-                <span className="font-semibold text-gray-900 tabular-nums">{fmtNum(r.count)}</span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className="font-semibold text-gray-900 tabular-nums">{fmtNum(r.count)}</span>
+                  {onExtract && (
+                    <button
+                      type="button"
+                      onClick={() => onExtract({ dregion: r.name })}
+                      className="inline-flex items-center text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/30 hover:border-[#28B8D8] rounded-md p-1 transition-colors"
+                      title={`Télécharger les donateurs : ${r.name}`}
+                    >
+                      <Download size={13} />
+                    </button>
+                  )}
+                </span>
               </li>
             ))}
           </ol>

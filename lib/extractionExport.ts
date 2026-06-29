@@ -28,8 +28,11 @@ export interface ExtractionFilters {
   post: Tri;
   tel: Tri;
   email: Tri;
-  region: string;       // exact, '' = any
-  dept: string;         // exact, '' = any
+  pcat: string[];       // raw RGPD POST category (Donateurs consent segments)
+  region: string;       // exact tx-location region, '' = any (map)
+  dept: string;         // exact tx-location dept, '' = any (map)
+  dregion: string;      // exact donor HOME region, '' = any (Donateurs)
+  ddept: string;        // exact donor HOME dept, '' = any (Donateurs)
   city: string;         // contains
 }
 export type Tri = 'tous' | 'IN' | 'OUT';
@@ -38,8 +41,8 @@ export const EMPTY_FILTERS: ExtractionFilters = {
   stip: [], dest: [], cause: [], pay: [],
   amountMin: '', amountMax: '', dateFrom: '', dateTo: '',
   activite: [], palier: [], genre: [], type: [],
-  post: 'tous', tel: 'tous', email: 'tous',
-  region: '', dept: '', city: '',
+  post: 'tous', tel: 'tous', email: 'tous', pcat: [],
+  region: '', dept: '', dregion: '', ddept: '', city: '',
 };
 
 // Gift-level predicate. AND-combines transaction + donor criteria. A donor is
@@ -63,8 +66,11 @@ export function matchesGift(r: ExtractionRecord, f: ExtractionFilters): boolean 
   if (f.post !== 'tous' && r.rPost !== f.post) return false;
   if (f.tel !== 'tous' && r.rTel !== f.tel) return false;
   if (f.email !== 'tous' && r.rEmail !== f.email) return false;
+  if (f.pcat.length && !f.pcat.includes(r.pcat)) return false;
   if (f.region && r.reg !== f.region) return false;
   if (f.dept && r.dept !== f.dept) return false;
+  if (f.dregion && r.dreg !== f.dregion) return false;
+  if (f.ddept && r.ddept !== f.ddept) return false;
   if (f.city && !r.city.toLowerCase().includes(f.city.toLowerCase())) return false;
   return true;
 }
@@ -98,7 +104,7 @@ export function dedupeDonors(rows: ExtractionRecord[]): Donor[] {
         nm: r.nm || `${r.fn} ${r.ln}`.trim(),
         email: r.email, phone: r.phone,
         addr: r.addr, pc: r.dpc || r.pc, city: r.loc || r.city,
-        dept: r.dept, region: r.reg, ctry: r.ctry,
+        dept: r.ddept || r.dept, region: r.dreg || r.reg, ctry: r.ctry,
         ltv: r.ltv, selAmount: 0, selCount: 0,
         causes: [], stips: [], dests: [],
         rPost: r.rPost, rTel: r.rTel, rEmail: r.rEmail,
@@ -209,16 +215,17 @@ function buildDonorWorkbook(rows: Donor[], label: string, range: { start: string
     });
   }
 
-  // Data cells: light borders + currency / integer number formats.
-  for (let r = firstDataR; r <= lastR; r++) {
-    for (let c = 0; c < ncols; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      const cell = ws[addr] as any;
-      if (!cell) continue;
-      cell.s = { ...(cell.s || {}), border: thinBorder('E2E8F0'), alignment: { vertical: 'center' } };
-      const kind = COLS[c].kind;
-      if (kind === 'eur') cell.z = '#,##0.00" €"';
-      else if (kind === 'int') cell.z = '#,##0';
+  // Number formats ONLY on the numeric columns. We deliberately avoid setting a
+  // per-cell style on every data cell — on large exports (50k+ rows) that bloats
+  // the .xlsx to tens of MB. The styled header + widths + autofilter + number
+  // formats give the "formatted" feel without the size blow-up.
+  for (let c = 0; c < ncols; c++) {
+    const kind = COLS[c].kind;
+    if (!kind) continue;
+    const z = kind === 'eur' ? '#,##0.00" €"' : '#,##0';
+    for (let r = firstDataR; r <= lastR; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })] as any;
+      if (cell) cell.z = z;
     }
   }
 
@@ -236,7 +243,9 @@ function slugify(label: string): string {
 // Write the workbook to an .xlsx blob and trigger a download (browser-safe;
 // avoids SheetJS's fs path). Runs synchronously to preserve the click gesture.
 function triggerXlsxDownload(wb: XLSX.WorkBook, label: string) {
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  // compression:true is essential — SheetJS stores the zip UNCOMPRESSED by
+  // default, which makes a 56k-row export ~60MB instead of ~6MB.
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true });
   const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const date = new Date().toISOString().slice(0, 10);
@@ -254,8 +263,10 @@ export function sliceLabel(seed: Partial<ExtractionFilters>): string {
   const one = (a?: string[]) => (a && a.length === 1 ? a[0] : undefined);
   return (
     one(seed.cause) || one(seed.stip) || one(seed.dest) || one(seed.pay) ||
+    one(seed.activite) || one(seed.palier) || one(seed.type) || one(seed.pcat) ||
     (seed.dept ? `dept-${seed.dept}` : '') ||
-    seed.region || seed.city ||
+    (seed.ddept ? `dept-${seed.ddept}` : '') ||
+    seed.dregion || seed.region || seed.city ||
     (seed.cause?.length ? 'toutes-causes' : '') ||
     (seed.stip?.length ? 'toutes-stipulations' : '') ||
     (seed.dest?.length ? 'toutes-destinations' : '') ||
@@ -273,12 +284,15 @@ export function downloadDonorsForSlice(
   records: ExtractionRecord[],
   seed: Partial<ExtractionFilters>,
   range: { start: string; end: string },
+  opts?: { allTime?: boolean },
 ): number {
   const filters: ExtractionFilters = {
     ...EMPTY_FILTERS,
     ...seed,
-    dateFrom: range.start,
-    dateTo: range.end,
+    // Donateurs-tab downloads are donor-attribute slices (not date-scoped) and
+    // must include giftless donors (dt=''), so skip the date filter entirely.
+    dateFrom: opts?.allTime ? '' : range.start,
+    dateTo: opts?.allTime ? '' : range.end,
   };
   const gifts = records.filter((r) => matchesGift(r, filters));
   const donors = dedupeDonors(gifts);

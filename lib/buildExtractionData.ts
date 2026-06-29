@@ -133,11 +133,13 @@ function num(v: any): number {
   const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
   return isNaN(n) ? 0 : n;
 }
+// NOTE: these strings MUST match aggregateDonverse.tierName so the Donateurs-tab
+// segment downloads line up exactly with the displayed counts.
 function tierName(amount: number): string {
-  if (amount >= 5000) return 'Major (≥5k€)';
-  if (amount >= 1500) return 'Generous';
-  if (amount >= 500) return 'Engaged';
-  return 'Kind (<500€)';
+  if (amount >= 5000) return 'Major (≥5k)';
+  if (amount >= 1500) return 'Generous (1.5-5k)';
+  if (amount >= 500) return 'Engaged (500-1.5k)';
+  return 'Kind (<500)';
 }
 function dayStr(d: any): string {
   if (d == null || d === '') return '';
@@ -182,10 +184,13 @@ export interface ExtractionRecord {
   rPost: 'IN' | 'OUT';   // rgpdPost
   rTel: 'IN' | 'OUT';    // rgpdTel (RGPD TELEMARKETING)
   rEmail: 'IN' | 'OUT';  // rgpdEmail (RGPD EMAIL)
+  pcat: string;      // raw RGPD POST category (Opt-In / Opt-Out / Non renseigné / …) — matches Donateurs consent chart
   act: string;       // activity
   tier: string;      // tier
   genre: string;     // genre from Title
   type: string;      // Individual / Organization
+  ddept: string;     // donor HOME department (from donor postal) — for Donateurs region downloads
+  dreg: string;      // donor HOME region
   matched: 0 | 1;    // 1 if a donor row was joined, 0 if tx-only fallback
 }
 
@@ -198,13 +203,15 @@ interface DonorInfo {
   civ: string; fn: string; ln: string; email: string; phone: string;
   addr: string; loc: string; dpc: string; ctry: string;
   ltv: number; rPost: 'IN' | 'OUT'; rTel: 'IN' | 'OUT'; rEmail: 'IN' | 'OUT';
-  act: string; tier: string; genre: string; type: string;
+  pcat: string; act: string; tier: string; genre: string; type: string;
+  ddept: string; dreg: string;
 }
 
 function buildDonorInfo(r: any): DonorInfo {
   const amount = num(r['Total Donation Amount']);
   const addr = ['Address Line 1', 'Address Line 2', 'Address Line 3', 'Address Line 4']
     .map((k) => str(r[k])).filter(Boolean).join(', ');
+  const ddept = deptFromPostal(r['Postal Code']);
   return {
     civ: str(r['Title']),
     fn: str(r['First Name']),
@@ -219,10 +226,13 @@ function buildDonorInfo(r: any): DonorInfo {
     rPost: rgpdStatus(r['RGPD POST IN']),
     rTel: rgpdStatus(r['RGPD TELEMARKETING']),
     rEmail: rgpdStatus(r['RGPD EMAIL']),
+    pcat: str(r['RGPD POST IN']) || 'Non renseigné',
     act: activityName(r['Maximum Donation Date']),
     tier: tierName(amount),
     genre: genreFromTitle(r['Title']),
-    type: str(r['Type']) || 'Non déterminé',
+    type: normSimple(r['Type']),
+    ddept: ddept || '',
+    dreg: ddept ? (DEPT_TO_REGION[ddept] || '') : '',
   };
 }
 
@@ -239,6 +249,7 @@ export function buildExtractionData(txRows: any[], donorRows: any[]): Extraction
   }
 
   const records: ExtractionRecord[] = [];
+  const seenRefs = new Set<string>();
   let txTotalBase = 0;
 
   for (const r of txRows) {
@@ -246,6 +257,7 @@ export function buildExtractionData(txRows: any[], donorRows: any[]): Extraction
     txTotalBase += amt;
 
     const ref = str(r['Account Reference']);
+    if (ref) seenRefs.add(ref);
     const dept = deptFromPostal(r['Postal Code']);
     const d = ref ? donorByRef.get(ref) : undefined;
 
@@ -283,11 +295,36 @@ export function buildExtractionData(txRows: any[], donorRows: any[]): Extraction
       rPost: d ? d.rPost : 'OUT',
       rTel: d ? d.rTel : 'OUT',
       rEmail: d ? d.rEmail : 'OUT',
+      pcat: d ? d.pcat : 'Non renseigné',
       act: d ? d.act : 'Inconnu',
-      tier: d ? d.tier : 'Kind (<500€)',
+      tier: d ? d.tier : 'Kind (<500)',
       genre: d ? d.genre : 'Non déterminé',
-      type: d ? d.type : (str(r['Type']) || 'Non déterminé'),
+      type: d ? d.type : normSimple(r['Type']),
+      ddept: d ? d.ddept : '',
+      dreg: d ? d.dreg : '',
       matched: d ? 1 : 0,
+    });
+  }
+
+  // Append donor-level records for donors with NO 2025 gift, so the Donateurs
+  // tab (full donor base) can export every segment — not just the gift-active
+  // subset. These carry empty gift fields (dt/amt/cause/…); geo = donor home.
+  for (const r of donorRows) {
+    const ref = str(r['Reference']);
+    if (!ref || seenRefs.has(ref)) continue;
+    const info = donorByRef.get(ref);
+    if (!info) continue;
+    seenRefs.add(ref);
+    records.push({
+      dt: '', amt: 0, stip: '', dest: '', cause: '', pay: '',
+      dept: info.ddept, reg: info.dreg, city: info.loc, pc: info.dpc, ref,
+      civ: info.civ, fn: info.fn, ln: info.ln,
+      nm: `${info.fn} ${info.ln}`.trim() || info.ln,
+      email: info.email, phone: info.phone, addr: info.addr,
+      loc: info.loc, dpc: info.dpc, ctry: info.ctry,
+      ltv: info.ltv, rPost: info.rPost, rTel: info.rTel, rEmail: info.rEmail,
+      pcat: info.pcat, act: info.act, tier: info.tier, genre: info.genre, type: info.type,
+      ddept: info.ddept, dreg: info.dreg, matched: 1,
     });
   }
 

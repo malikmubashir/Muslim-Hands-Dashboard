@@ -74,6 +74,32 @@ const DonverseApp: React.FC = () => {
     }
   }, [range, exporting, records]);
 
+  // Donateurs-tab downloads: donor-attribute slices over the FULL base, NOT
+  // date-scoped (the tab is a snapshot). Includes giftless donors.
+  const extractDonors = useCallback(async (seed: Partial<ExtractionFilters>) => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      let recs = records;
+      if (!recs) {
+        setToast('Préparation des données de contact…');
+        recs = await getExtractionRecords();
+        setRecords(recs);
+      }
+      if (!recs.length) {
+        setToast('Aucune donnée de contact disponible. Mettez à jour les données.');
+      } else {
+        const n = downloadDonorsForSlice(recs, seed, { start: '', end: '' }, { allTime: true });
+        setToast(n > 0 ? `${n.toLocaleString('fr-FR')} donateurs téléchargés (Excel).` : 'Aucun donateur pour cette sélection.');
+      }
+    } catch {
+      setToast('Échec du téléchargement.');
+    } finally {
+      setExporting(false);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }, [exporting, records]);
+
   // Distinct donors who gave within the selected period (date-aware KPI).
   const donorsInPeriod = useMemo(() => {
     if (!records || !range) return undefined;
@@ -291,9 +317,9 @@ const DonverseApp: React.FC = () => {
               <>
                 <div className="flex items-center gap-2 text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                   <Info size={14} className="text-blue-500 shrink-0" />
-                  Instantané, non filtré par date.
+                  Instantané, non filtré par date. Les téléchargements couvrent toute la base.
                 </div>
-                <DonorsView data={data} />
+                <DonorsView data={data} onExtract={extractDonors} />
               </>
             )}
           </div>
