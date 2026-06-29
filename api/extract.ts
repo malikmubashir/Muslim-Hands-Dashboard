@@ -16,7 +16,7 @@
 // team password — no PII is exposed.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { put, list } from '@vercel/blob';
-import { isAuthorized } from './_auth';
+import { isAuthorized } from './_auth.js';
 
 const BLOB_KEY = 'extract-enc.json';
 

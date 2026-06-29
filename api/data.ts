@@ -19,7 +19,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { put, list } from '@vercel/blob';
-import { isAuthorized } from './_auth';
+import { isAuthorized } from './_auth.js';
 
 const BLOB_KEY = 'donverse-latest.json';
 

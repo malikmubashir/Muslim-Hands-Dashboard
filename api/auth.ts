@@ -4,7 +4,7 @@
 // load any data. Returns 200 if the `x-dashboard-password` header matches
 // `DASHBOARD_PASSWORD`, otherwise 401. No body of substance is returned.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isAuthorized } from './_auth';
+import { isAuthorized } from './_auth.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
