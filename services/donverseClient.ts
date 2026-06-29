@@ -105,13 +105,23 @@ export async function loadDataset(): Promise<LoadedDataset> {
     err.code = 401;
     throw err;
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  return {
-    data: json.data as DonverseData,
-    source: (json.source as LoadedDataset['source']) || 'uploaded',
-    lastUpdated: json.lastUpdated || '',
-  };
+  // Use /api/data only if it actually returned JSON; otherwise (functions
+  // unavailable, a non-JSON error page, etc.) fall back to the static seed.
+  const ct = res.headers.get('content-type') || '';
+  if (res.ok && ct.includes('application/json')) {
+    const json = await res.json();
+    if (json && json.data) {
+      return {
+        data: json.data as DonverseData,
+        source: (json.source as LoadedDataset['source']) || 'uploaded',
+        lastUpdated: json.lastUpdated || '',
+      };
+    }
+  }
+  const res2 = await fetch('/data/donverse.json', { cache: 'no-store' });
+  if (!res2.ok) throw new Error(`Données indisponibles (HTTP ${res2.status}).`);
+  const data = (await res2.json()) as DonverseData;
+  return { data, source: 'seed', lastUpdated: data.meta?.generatedAt || '' };
 }
 
 /** Upload an anonymized DonverseData payload. Throws with a French message. */
