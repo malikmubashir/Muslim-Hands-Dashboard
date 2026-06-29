@@ -2,7 +2,11 @@ import React, { useCallback, useState } from 'react';
 import { X, UploadCloud, Loader2, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { aggregateDonverse } from '../../lib/aggregateDonverse';
-import { uploadDataset } from '../../services/donverseClient';
+import { buildExtractionData } from '../../lib/buildExtractionData';
+import { encryptJSON } from '../../services/cryptoStore';
+import {
+  uploadDataset, uploadExtractionCiphertext, getStoredPassword, DEV_BYPASS,
+} from '../../services/donverseClient';
 
 interface Props {
   onClose: () => void;
@@ -93,9 +97,24 @@ const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
         generatedAt: new Date().toISOString(),
       });
 
-      // 4) Upload ONLY the anonymized aggregate.
+      // 4) Upload ONLY the anonymized aggregate (no contact PII).
       setPhase('Envoi des données anonymisées…');
       await uploadDataset(data);
+
+      // 5) Build the COMBINED donor+transaction extraction dataset (PII), then
+      //    ENCRYPT it in the browser with the team password and POST only the
+      //    ciphertext. Plaintext PII never leaves this browser. Skipped in dev
+      //    (no session password / no serverless endpoint).
+      if (!DEV_BYPASS) {
+        const pw = getStoredPassword() || '';
+        if (pw) {
+          setPhase('Chiffrement et enregistrement de l’extraction…');
+          await new Promise((r) => setTimeout(r, 50)); // let the phase paint
+          const extraction = buildExtractionData(txRows, donorRows);
+          const ciphertext = await encryptJSON(extraction, pw);
+          await uploadExtractionCiphertext(ciphertext);
+        }
+      }
 
       setDone(true);
       setTimeout(() => onUpdated(), 600);

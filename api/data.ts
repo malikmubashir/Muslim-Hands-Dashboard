@@ -1,6 +1,7 @@
 // /api/data — read & write the shared DONVERSE dataset (anonymized only).
 //
-// OPEN ACCESS: no password. Both methods are unauthenticated.
+// GATED: both methods require the team password via `x-dashboard-password`
+// (validated by api/_auth.isAuthorized; fail-closed if DASHBOARD_PASSWORD unset).
 //
 // GET  : Returns the latest dataset. If a blob `donverse-latest.json` exists,
 //        fetch + return it (source "uploaded"); otherwise return the bundled
@@ -18,6 +19,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { put, list } from '@vercel/blob';
+import { isAuthorized } from './_auth';
 
 const BLOB_KEY = 'donverse-latest.json';
 
@@ -55,6 +57,11 @@ function looksLikeDonverseData(d: any): boolean {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Shared-password gate: BOTH GET and POST require the team password header.
+  if (!isAuthorized(req)) {
+    return res.status(401).json({ ok: false, error: 'Mot de passe incorrect.' });
+  }
+
   // ---------------------------------------------------------------- GET ----
   if (req.method === 'GET') {
     const latest = await findLatestBlob();

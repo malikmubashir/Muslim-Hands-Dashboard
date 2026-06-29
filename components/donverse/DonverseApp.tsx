@@ -11,7 +11,10 @@ import { ExtractionView, ExtractionFilters } from './ExtractionView';
 import { ThemeDetail } from './ThemeDetail';
 import { DateRangeBar, DateRange } from './DateRangeBar';
 import UpdateDataModal from './UpdateDataModal';
-import { loadDataset, LoadedDataset } from '../../services/donverseClient';
+import PasswordGate from './PasswordGate';
+import {
+  loadDataset, LoadedDataset, DEV_BYPASS, checkPassword, getStoredPassword,
+} from '../../services/donverseClient';
 import { sliceCube } from '../../services/cube';
 
 const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
@@ -22,6 +25,11 @@ const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
 ];
 
 const DonverseApp: React.FC = () => {
+  // ---- Shared-password gate (whole app) ----
+  // In dev we bypass entirely; in prod we require a valid session password.
+  const [unlocked, setUnlocked] = useState<boolean>(DEV_BYPASS);
+  const [authChecked, setAuthChecked] = useState<boolean>(DEV_BYPASS);
+
   const [data, setData] = useState<DonverseData | null>(null);
   const [meta, setMeta] = useState<{ source: LoadedDataset['source']; lastUpdated: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,9 +73,25 @@ const DonverseApp: React.FC = () => {
       });
   }, []);
 
+  // On mount (prod only): re-validate any password already in sessionStorage so
+  // a returning tab skips the gate. If invalid/missing, show the gate.
   useEffect(() => {
-    load();
-  }, [load]);
+    if (DEV_BYPASS) return;
+    let alive = true;
+    (async () => {
+      const stored = getStoredPassword();
+      if (stored && (await checkPassword(stored))) {
+        if (alive) setUnlocked(true);
+      }
+      if (alive) setAuthChecked(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Load the dataset only once the app is unlocked.
+  useEffect(() => {
+    if (unlocked) load();
+  }, [unlocked, load]);
 
   const onUpdated = useCallback(() => {
     setShowUpdate(false);
@@ -98,6 +122,20 @@ const DonverseApp: React.FC = () => {
     const t = all.byTheme.find((x) => x.name === selectedTheme);
     return all.total && t ? t.value / all.total : 0;
   }, [data, range, selectedTheme]);
+
+  // ---- Gate rendering (prod only) ----
+  if (!unlocked) {
+    // While re-validating a stored password, show a brief loader to avoid a
+    // flash of the gate for returning sessions.
+    if (!authChecked) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-gray-400">
+          <Loader2 size={22} className="animate-spin" />
+        </div>
+      );
+    }
+    return <PasswordGate onUnlock={() => setUnlocked(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
