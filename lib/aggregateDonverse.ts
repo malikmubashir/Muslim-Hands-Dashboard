@@ -91,6 +91,10 @@ function themeKey(s: string): string {
 }
 const STIP_MAP: Record<string, string> = {
   'Zakat El MAal': 'Zakat El Maal',
+  // "Don / Sadaqa" is the same as plain Sadaqa — merge them.
+  'Don / Sadaqa': 'Sadaqa',
+  'Don/Sadaqa': 'Sadaqa',
+  'Don / sadaqa': 'Sadaqa',
   // Merge the various "bank interest" spellings into a single "Intérêt" category.
   'Intérêts bancaires': 'Intérêt',
   'Interets bancaires': 'Intérêt',
