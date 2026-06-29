@@ -227,9 +227,10 @@ const DonverseApp: React.FC = () => {
                     range={range}
                     shareOfTotal={themeShare}
                     onBack={() => setSelectedTheme(null)}
+                    onExtract={goExtract}
                   />
                 ) : (
-                  <OverviewView data={data} range={range} onSelectTheme={setSelectedTheme} />
+                  <OverviewView data={data} range={range} onSelectTheme={setSelectedTheme} onExtract={goExtract} />
                 )
               ) : (
                 <LegacyNotice />

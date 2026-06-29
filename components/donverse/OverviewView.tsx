@@ -4,22 +4,37 @@ import {
   PieChart, Pie, AreaChart, Area, Legend,
 } from 'recharts';
 import {
-  Euro, Receipt, TrendingUp, Users, CreditCard, HandHeart, CalendarCheck, Sparkles, ChevronRight,
+  Euro, Receipt, TrendingUp, Users, CreditCard, HandHeart, CalendarCheck, Sparkles, ChevronRight, Contact,
 } from 'lucide-react';
 import { DonverseData } from './types';
 import { KpiCard } from './KpiCard';
 import { ChartCard } from './ExportButtons';
 import { sliceCube } from '../../services/cube';
 import type { DateRange } from './DateRangeBar';
+import type { ExtractionFilters } from './ExtractionView';
 import { fmtEur, fmtEur2, fmtNum, fmtPct, fmtEurShort, fmtMonth, fmtMonthShort, MH, paletteAt } from './format';
 
 interface OverviewProps {
   data: DonverseData;
   range: DateRange;
   onSelectTheme: (theme: string) => void;
+  /** Seed the Extraction tab pre-filtered (dashboard "Extraire" hooks). */
+  onExtract?: (seed: Partial<ExtractionFilters>) => void;
 }
 
-export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectTheme }) => {
+// Small "Extraire" button for a chart Card header.
+const ExtraireBtn: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/40 hover:border-[#28B8D8] rounded-md px-2 py-1 transition-colors"
+    title="Extraire les donateurs de ce graphique"
+  >
+    <Contact size={13} /> Extraire
+  </button>
+);
+
+export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectTheme, onExtract }) => {
   const s = useMemo(() => sliceCube(data, range), [data, range]);
 
   const months = useMemo(
@@ -47,9 +62,12 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
 
       {/* Clickable themes list */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Causes / Thèmes</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Cliquez une cause pour explorer le détail (stipulation, paiement, destinations, villes, départements…)</p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Causes / Thèmes</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Cliquez une cause pour explorer le détail. « Extraire » pré-filtre les donateurs.</p>
+          </div>
+          {onExtract && <ExtraireBtn onClick={() => onExtract({ cause: s.byTheme.map((t) => t.name) })} />}
         </div>
         <ul className="divide-y divide-gray-50">
           {s.byTheme.map((t, i) => {
@@ -84,7 +102,8 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stipulation donut */}
-        <ChartCard title="Répartition par stipulation" sub="Sadaqa / Zakat / …" exportName="tableau-stipulation">
+        <ChartCard title="Répartition par stipulation" sub="Sadaqa / Zakat / …" exportName="tableau-stipulation"
+          headerExtra={onExtract && <ExtraireBtn onClick={() => onExtract({ stip: s.byStipulation.map((x) => x.name) })} />}>
           <ResponsiveContainer width="100%" height={340}>
             <PieChart>
               <Pie data={s.byStipulation} dataKey="value" nameKey="name" innerRadius={70} outerRadius={120} paddingAngle={2}>
@@ -102,7 +121,10 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
           sub="Le prélèvement automatique (PA) est mis en évidence"
           exportName="tableau-paiement"
           headerExtra={
-            <span className="text-xs text-gray-500">PA : <span className="font-bold text-emerald-700">{fmtPct(s.paShare * 100)}</span></span>
+            <span className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">PA : <span className="font-bold text-emerald-700">{fmtPct(s.paShare * 100)}</span></span>
+              {onExtract && <ExtraireBtn onClick={() => onExtract({ pay: payments.map((p) => p.name) })} />}
+            </span>
           }
         >
           <ResponsiveContainer width="100%" height={340}>
@@ -139,7 +161,8 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
       </ChartCard>
 
       {/* Destinations — full width */}
-      <ChartCard title="Top destinations" sub="Top 8 par montant collecté" exportName="tableau-destinations">
+      <ChartCard title="Top destinations" sub="Top 8 par montant collecté" exportName="tableau-destinations"
+        headerExtra={onExtract && <ExtraireBtn onClick={() => onExtract({ dest: destinations.map((x) => x.name) })} />}>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={destinations} layout="vertical" margin={{ left: 10, right: 24 }}>
             <CartesianGrid horizontal={false} stroke="#f1f5f9" />

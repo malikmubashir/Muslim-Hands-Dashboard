@@ -3,12 +3,13 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, AreaChart, Area, Legend,
 } from 'recharts';
-import { ArrowLeft, Euro, Receipt, TrendingUp, Percent, CalendarCheck } from 'lucide-react';
+import { ArrowLeft, Euro, Receipt, TrendingUp, Percent, CalendarCheck, Contact } from 'lucide-react';
 import { DonverseData } from './types';
 import { KpiCard } from './KpiCard';
 import { ChartCard } from './ExportButtons';
 import { sliceCube } from '../../services/cube';
 import type { DateRange } from './DateRangeBar';
+import type { ExtractionFilters } from './ExtractionView';
 import { fmtEur, fmtEur2, fmtNum, fmtPct, fmtEurShort, fmtMonth, fmtMonthShort, MH, paletteAt } from './format';
 
 interface ThemeDetailProps {
@@ -18,9 +19,11 @@ interface ThemeDetailProps {
   /** Share of the whole (range) total this theme represents, 0..1. */
   shareOfTotal: number;
   onBack: () => void;
+  /** Seed the Extraction tab pre-filtered to this cause. */
+  onExtract?: (seed: Partial<ExtractionFilters>) => void;
 }
 
-export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, shareOfTotal, onBack }) => {
+export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, shareOfTotal, onBack, onExtract }) => {
   const s = useMemo(() => sliceCube(data, range, theme), [data, range, theme]);
   const slugBase = `${theme}`;
 
@@ -43,9 +46,20 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
         >
           <ArrowLeft size={16} /> Toutes les causes
         </button>
-        <span className="text-xs text-gray-500">
-          Période : <span className="font-medium text-gray-700">{fmtMonth(range.start)} → {fmtMonth(range.end)}</span>
-        </span>
+        <div className="flex items-center gap-3">
+          {onExtract && (
+            <button
+              type="button"
+              onClick={() => onExtract({ cause: [theme] })}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <Contact size={14} /> Extraire les donateurs de cette cause
+            </button>
+          )}
+          <span className="text-xs text-gray-500">
+            Période : <span className="font-medium text-gray-700">{fmtMonth(range.start)} → {fmtMonth(range.end)}</span>
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
