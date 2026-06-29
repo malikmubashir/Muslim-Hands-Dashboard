@@ -7,9 +7,13 @@ import { ArrowLeft, Euro, Receipt, TrendingUp, Percent, CalendarCheck, Contact }
 import { DonverseData } from './types';
 import { KpiCard } from './KpiCard';
 import { ChartCard } from './ExportButtons';
+import { CategoryDownloadBar } from './CategoryDownloadBar';
 import { sliceCube } from '../../services/cube';
 import type { DateRange } from './DateRangeBar';
-import type { ExtractionFilters } from './ExtractionView';
+import type { ExtractionFilters } from '../../lib/extractionExport';
+
+// Pull a category name out of a recharts click payload (Pie / Bar).
+const clickName = (d: any): string | undefined => d?.payload?.name ?? d?.name;
 import { fmtEur, fmtEur2, fmtNum, fmtPct, fmtEurShort, fmtMonth, fmtMonthShort, MH, paletteAt } from './format';
 
 interface ThemeDetailProps {
@@ -53,7 +57,7 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
               onClick={() => onExtract({ cause: [theme] })}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-1.5 transition-colors"
             >
-              <Contact size={14} /> Extraire les donateurs de cette cause
+              <Contact size={14} /> Télécharger les donateurs de cette cause
             </button>
           )}
           <span className="text-xs text-gray-500">
@@ -90,22 +94,25 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stipulation donut */}
-        <ChartCard title="Stipulation" sub="Sadaqa / Zakat / …" exportName={`${slugBase}-stipulation`}>
+        <ChartCard title="Stipulation" sub={onExtract ? 'Cliquez une part pour télécharger ses donateurs' : 'Sadaqa / Zakat / …'} exportName={`${slugBase}-stipulation`}>
           <ResponsiveContainer width="100%" height={320}>
             <PieChart>
-              <Pie data={s.byStipulation} dataKey="value" nameKey="name" innerRadius={70} outerRadius={120} paddingAngle={2}>
+              <Pie data={s.byStipulation} dataKey="value" nameKey="name" innerRadius={70} outerRadius={120} paddingAngle={2}
+                cursor={onExtract ? 'pointer' : undefined}
+                onClick={(d: any) => { const n = clickName(d); if (n && onExtract) onExtract({ cause: [theme], stip: [n] }); }}>
                 {s.byStipulation.map((_, i) => <Cell key={i} fill={paletteAt(i)} />)}
               </Pie>
               <Tooltip formatter={(v: number) => fmtEur(v)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par stipulation" items={s.byStipulation} onPick={(name) => onExtract({ cause: [theme], stip: [name] })} />}
         </ChartCard>
 
         {/* Payment methods */}
         <ChartCard
           title="Moyens de paiement"
-          sub="Le prélèvement automatique (PA) est mis en évidence"
+          sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs · PA mis en évidence' : 'Le prélèvement automatique (PA) est mis en évidence'}
           exportName={`${slugBase}-paiement`}
           headerExtra={
             <span className="text-xs text-gray-500">PA : <span className="font-bold text-emerald-700">{fmtPct(s.paShare * 100)}</span></span>
@@ -117,43 +124,49 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} interval={0} angle={-25} textAnchor="end" height={70} />
               <YAxis tickFormatter={fmtEurShort} tick={{ fontSize: 11, fill: '#64748b' }} width={64} />
               <Tooltip formatter={(v: number) => fmtEur(v)} cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} cursor={onExtract ? 'pointer' : undefined}
+                onClick={(d: any) => { const n = clickName(d); if (n && onExtract) onExtract({ cause: [theme], pay: [n] }); }}>
                 {payments.map((p, i) => <Cell key={i} fill={p.isPA ? MH.green : '#cbd5e1'} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par moyen de paiement" items={payments} onPick={(name) => onExtract({ cause: [theme], pay: [name] })} />}
         </ChartCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Destinations */}
-        <ChartCard title="Destinations" sub="Top 10 par montant collecté" exportName={`${slugBase}-destinations`}>
+        <ChartCard title="Destinations" sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs' : 'Top 10 par montant collecté'} exportName={`${slugBase}-destinations`}>
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={destinations} layout="vertical" margin={{ left: 10, right: 24 }}>
               <CartesianGrid horizontal={false} stroke="#f1f5f9" />
               <XAxis type="number" tickFormatter={fmtEurShort} tick={{ fontSize: 11, fill: '#64748b' }} />
               <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: '#334155' }} />
               <Tooltip formatter={(v: number) => fmtEur(v)} cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="value" radius={[0, 4, 4, 0]} cursor={onExtract ? 'pointer' : undefined}
+                onClick={(d: any) => { const n = clickName(d); if (n && onExtract) onExtract({ cause: [theme], dest: [n] }); }}>
                 {destinations.map((_, i) => <Cell key={i} fill={paletteAt(i)} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par destination" items={destinations} onPick={(name) => onExtract({ cause: [theme], dest: [name] })} />}
         </ChartCard>
 
         {/* Top 10 cities */}
-        <ChartCard title="Top 10 villes" sub="Là où le plus a été collecté (estimation top 30/mois)" exportName={`${slugBase}-villes`}>
+        <ChartCard title="Top 10 villes" sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs' : 'Là où le plus a été collecté (estimation top 30/mois)'} exportName={`${slugBase}-villes`}>
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={topCities} layout="vertical" margin={{ left: 10, right: 24 }}>
               <CartesianGrid horizontal={false} stroke="#f1f5f9" />
               <XAxis type="number" tickFormatter={fmtEurShort} tick={{ fontSize: 11, fill: '#64748b' }} />
               <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: '#334155' }} />
               <Tooltip formatter={(v: number) => fmtEur(v)} cursor={{ fill: '#f8fafc' }} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="value" radius={[0, 4, 4, 0]} cursor={onExtract ? 'pointer' : undefined}
+                onClick={(d: any) => { const n = clickName(d); if (n && onExtract) onExtract({ cause: [theme], city: n }); }}>
                 {topCities.map((_, i) => <Cell key={i} fill={paletteAt(i + 2)} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par ville" items={topCities} onPick={(name) => onExtract({ cause: [theme], city: name })} />}
         </ChartCard>
       </div>
 
@@ -177,18 +190,20 @@ export const ThemeDetail: React.FC<ThemeDetailProps> = ({ data, theme, range, sh
       </ChartCard>
 
       {/* Top 10 départements */}
-      <ChartCard title="Top 10 départements" sub="Par montant collecté" exportName={`${slugBase}-departements`}>
+      <ChartCard title="Top 10 départements" sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs' : 'Par montant collecté'} exportName={`${slugBase}-departements`}>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={topDepts} margin={{ left: 8, right: 16 }}>
             <CartesianGrid stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="code" tick={{ fontSize: 11, fill: '#64748b' }} interval={0} />
             <YAxis tickFormatter={fmtEurShort} tick={{ fontSize: 11, fill: '#64748b' }} width={64} />
             <Tooltip formatter={(v: number) => fmtEur(v)} cursor={{ fill: '#f8fafc' }} labelFormatter={(l) => `Dépt ${l}`} />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            <Bar dataKey="value" radius={[4, 4, 0, 0]} cursor={onExtract ? 'pointer' : undefined}
+              onClick={(d: any) => { const code = d?.payload?.code; if (code && onExtract) onExtract({ cause: [theme], dept: code }); }}>
               {topDepts.map((_, i) => <Cell key={i} fill={paletteAt(i)} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par département" items={topDepts.map((d) => ({ name: d.code }))} onPick={(code) => onExtract({ cause: [theme], dept: code })} />}
       </ChartCard>
       </>
       )}

@@ -55,7 +55,12 @@ export function clearStoredPassword(): void {
 }
 
 /** In dev we bypass the gate entirely (Vite serves no /api functions). */
-export const DEV_BYPASS = import.meta.env.DEV;
+// `import.meta.env.DEV` can be clobbered to `false` by the `define:
+// { 'process.env': {} }` shim in vite.config (needed so libs that read
+// process.env don't crash in the browser). MODE stays reliable, so we treat
+// any non-production MODE as local dev. In a real `vite build` MODE is
+// 'production', so this is false on Vercel + in `vite preview`.
+export const DEV_BYPASS = import.meta.env.DEV || import.meta.env.MODE !== 'production';
 
 /** Validate a password against /api/auth. Returns true on 200. */
 export async function checkPassword(pw: string): Promise<boolean> {
@@ -218,6 +223,25 @@ let extractionPromise: Promise<ExtractionDataset | null> | null = null;
 export async function getExtractionDataset(): Promise<ExtractionDataset | null> {
   if (extractionCache) return extractionCache;
   if (extractionPromise) return extractionPromise;
+
+  // DEV: no /api/extract function and no ciphertext. Read a local PLAINTEXT
+  // dataset (public/data/extraction-dev.json, gitignored) so the Extraction
+  // tab is fully testable on the plain `vite` dev server. Generate it with
+  // `npx tsx scripts/extract-dev.ts`. Never used in production.
+  if (DEV_BYPASS) {
+    extractionPromise = (async () => {
+      try {
+        const res = await fetch('/data/extraction-dev.json', { cache: 'no-store' });
+        if (!res.ok) return null;
+        const dataset = (await res.json()) as ExtractionDataset;
+        extractionCache = dataset;
+        return dataset;
+      } catch {
+        return null;
+      }
+    })().finally(() => { extractionPromise = null; });
+    return extractionPromise;
+  }
 
   extractionPromise = (async () => {
     const payload = await loadExtractionCiphertext();

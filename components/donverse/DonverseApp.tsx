@@ -1,27 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Map as MapIcon, Users, Loader2, AlertTriangle,
-  RefreshCw, CheckCircle2, LucideIcon, Info, Contact,
+  RefreshCw, CheckCircle2, LucideIcon, Info,
 } from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
-import { ExtractionView, ExtractionFilters } from './ExtractionView';
 import { ThemeDetail } from './ThemeDetail';
 import { DateRangeBar, DateRange } from './DateRangeBar';
 import UpdateDataModal from './UpdateDataModal';
 import PasswordGate from './PasswordGate';
 import {
   loadDataset, LoadedDataset, DEV_BYPASS, checkPassword, getStoredPassword,
+  getExtractionRecords, type ExtractionRecord,
 } from '../../services/donverseClient';
 import { sliceCube } from '../../services/cube';
+import { ExtractionFilters, downloadDonorsForSlice } from '../../lib/extractionExport';
 
 const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
   { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
   { key: 'map', label: 'Carte de France', icon: MapIcon },
   { key: 'donors', label: 'Donateurs', icon: Users },
-  { key: 'extraction', label: 'Extraction', icon: Contact },
 ];
 
 const DonverseApp: React.FC = () => {
@@ -38,15 +38,52 @@ const DonverseApp: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
-  // Seed for the Extraction view — set when the user jumps there from the map.
-  const [extractionSeed, setExtractionSeed] = useState<Partial<ExtractionFilters> | undefined>(undefined);
+  const [exporting, setExporting] = useState(false);
+  // Decrypted gift-level contact records, warmed once after unlock. Kept in
+  // memory only. Having them ready makes downloads fire synchronously inside the
+  // click gesture (no browser activation timeout) and powers the date-aware
+  // "Donateurs sur la période" KPI.
+  const [records, setRecords] = useState<ExtractionRecord[] | null>(null);
 
-  // Jump to Extraction pre-filtered to a selected map zone.
-  const goExtract = useCallback((seed: Partial<ExtractionFilters>) => {
-    setExtractionSeed(seed);
-    setSelectedTheme(null);
-    setView('extraction');
-  }, []);
+  // Download the donors behind a slice, on the spot, scoped to the current
+  // date range. The slice descriptor (seed) comes from whatever chart / list /
+  // map zone the user clicked. Everything happens in the browser.
+  const extractSlice = useCallback(async (seed: Partial<ExtractionFilters>) => {
+    if (!range || exporting) return;
+    setExporting(true);
+    try {
+      // Use the warmed cache if ready (synchronous → reliable save); otherwise
+      // fetch+decrypt once, with a clear "preparing" message.
+      let recs = records;
+      if (!recs) {
+        setToast('Préparation des données de contact…');
+        recs = await getExtractionRecords();
+        setRecords(recs);
+      }
+      if (!recs.length) {
+        setToast('Aucune donnée de contact disponible. Mettez à jour les données.');
+      } else {
+        const n = downloadDonorsForSlice(recs, seed, range);
+        setToast(n > 0 ? `${n.toLocaleString('fr-FR')} donateurs téléchargés (Excel).` : 'Aucun donateur pour cette sélection.');
+      }
+    } catch {
+      setToast('Échec du téléchargement.');
+    } finally {
+      setExporting(false);
+      setTimeout(() => setToast(null), 4000);
+    }
+  }, [range, exporting, records]);
+
+  // Distinct donors who gave within the selected period (date-aware KPI).
+  const donorsInPeriod = useMemo(() => {
+    if (!records || !range) return undefined;
+    const set = new Set<string>();
+    let anon = 0;
+    for (const r of records) {
+      if (r.dt && r.dt >= range.start && r.dt <= range.end) set.add(r.ref || `__n${anon++}`);
+    }
+    return set.size;
+  }, [records, range]);
 
   const load = useCallback(() => {
     setError(null);
@@ -92,6 +129,17 @@ const DonverseApp: React.FC = () => {
   useEffect(() => {
     if (unlocked) load();
   }, [unlocked, load]);
+
+  // Warm the decrypted contact records in the background after unlock so the
+  // first download is instant and never blocked by the activation timeout.
+  useEffect(() => {
+    if (!unlocked) return;
+    let alive = true;
+    getExtractionRecords()
+      .then((recs) => { if (alive) setRecords(recs); })
+      .catch(() => { if (alive) setRecords([]); });
+    return () => { alive = false; };
+  }, [unlocked]);
 
   const onUpdated = useCallback(() => {
     setShowUpdate(false);
@@ -227,17 +275,17 @@ const DonverseApp: React.FC = () => {
                     range={range}
                     shareOfTotal={themeShare}
                     onBack={() => setSelectedTheme(null)}
-                    onExtract={goExtract}
+                    onExtract={extractSlice}
                   />
                 ) : (
-                  <OverviewView data={data} range={range} onSelectTheme={setSelectedTheme} onExtract={goExtract} />
+                  <OverviewView data={data} range={range} onSelectTheme={setSelectedTheme} onExtract={extractSlice} donorsInPeriod={donorsInPeriod} />
                 )
               ) : (
                 <LegacyNotice />
               )
             )}
             {view === 'map' && (
-              <FranceMapView data={data} range={hasCube ? range : undefined} onExtract={goExtract} />
+              <FranceMapView data={data} range={hasCube ? range : undefined} onExtract={extractSlice} />
             )}
             {view === 'donors' && (
               <>
@@ -247,9 +295,6 @@ const DonverseApp: React.FC = () => {
                 </div>
                 <DonorsView data={data} />
               </>
-            )}
-            {view === 'extraction' && (
-              <ExtractionView initialFilters={extractionSeed} />
             )}
           </div>
         )}

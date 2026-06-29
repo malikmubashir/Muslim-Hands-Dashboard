@@ -30,3 +30,9 @@ data-source/*.xlsx
 data-source/*.xls
 data-source/*.csv
 .vercel
+
+# DEV-only plaintext extraction dataset (PII) — never commit or deploy.
+public/data/extraction-dev.json
+
+# Local backups of retired source files
+*.bak

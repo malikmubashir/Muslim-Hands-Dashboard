@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
-import { MapPin, RotateCcw, Search, Users } from 'lucide-react';
+import { MapPin, RotateCcw, Search, Users, Download } from 'lucide-react';
 import { DonverseData } from './types';
-import type { ExtractionFilters } from './ExtractionView';
+import type { ExtractionFilters } from '../../lib/extractionExport';
 import { DonCard, SectionTitle } from './DonCard';
 import { fmtEur, fmtEur2, fmtNum } from './format';
 import {
@@ -618,7 +618,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                       onClick={() => onExtract({ city: cityResult.name })}
                       className="mt-3 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
                     >
-                      <Users size={14} /> Extraire les donateurs
+                      <Users size={14} /> Télécharger les donateurs
                     </button>
                   )}
                 </>
@@ -658,7 +658,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                     }
                     className="mt-4 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
                   >
-                    <Users size={14} /> Extraire les donateurs
+                    <Users size={14} /> Télécharger les donateurs
                   </button>
                 )}
               </>
@@ -684,12 +684,24 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                     </li>
                   ))
                 : top10.map((x, i) => (
-                    <li key={x.row.key} className="flex items-center justify-between text-sm">
+                    <li key={x.row.key} className="flex items-center justify-between gap-2 text-sm">
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
                         <span className="truncate text-gray-700">{x.row.name}</span>
                       </span>
-                      <span className="font-semibold text-gray-900 tabular-nums">{fmtMetric(x.v, metric)}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="font-semibold text-gray-900 tabular-nums">{fmtMetric(x.v, metric)}</span>
+                        {onExtract && (
+                          <button
+                            type="button"
+                            onClick={() => onExtract(gran === 'dept' ? { dept: x.row.key } : { region: x.row.name })}
+                            className="inline-flex items-center text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/30 hover:border-[#28B8D8] rounded-md p-1 transition-colors"
+                            title={`Télécharger les donateurs : ${x.row.name} (période en cours)`}
+                          >
+                            <Download size={13} />
+                          </button>
+                        )}
+                      </span>
                     </li>
                   ))}
             </ol>
@@ -704,7 +716,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
               {top10Cities.length ? (
                 <ol className="space-y-1.5">
                   {top10Cities.map((c, i) => (
-                    <li key={c.name} className="flex items-center justify-between text-sm">
+                    <li key={c.name} className="flex items-center justify-between gap-2 text-sm">
                       <button
                         type="button"
                         onClick={() => locateCity(c.name)}
@@ -713,7 +725,19 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                         <span className="w-5 text-xs text-gray-400 tabular-nums">{i + 1}.</span>
                         <span className="truncate text-gray-700">{c.name}</span>
                       </button>
-                      <span className="font-semibold text-gray-900 tabular-nums">{fmtEur(c.value)}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="font-semibold text-gray-900 tabular-nums">{fmtEur(c.value)}</span>
+                        {onExtract && (
+                          <button
+                            type="button"
+                            onClick={() => onExtract({ city: c.name })}
+                            className="inline-flex items-center text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/30 hover:border-[#28B8D8] rounded-md p-1 transition-colors"
+                            title={`Télécharger les donateurs : ${c.name} (période en cours)`}
+                          >
+                            <Download size={13} />
+                          </button>
+                        )}
+                      </span>
                     </li>
                   ))}
                 </ol>
