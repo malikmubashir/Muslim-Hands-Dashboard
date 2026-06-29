@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, Legend,
@@ -201,6 +201,9 @@ interface Filters {
   dept: string;         // exact, '' = any
   city: string;         // contains
 }
+// Public alias so callers (e.g. the map view) can type a filter seed.
+export type ExtractionFilters = Filters;
+
 const EMPTY_FILTERS: Filters = {
   activite: [], palier: [], genre: [], type: [], status: '',
   amountMin: '', amountMax: '', post: 'tous', tel: 'tous', email: 'tous',
@@ -356,6 +359,25 @@ export const ExtractionView: React.FC<ExtractionViewProps> = ({ initialFilters }
     setFilters((f) => ({ ...f, [key]: value }));
   }, []);
 
+  // Apply a seed from the map (e.g. "Extraire les donateurs" for a zone).
+  // Merge it onto the current filters whenever the prop changes, so the
+  // pre-filter isn't lost even if no donor file is loaded yet.
+  useEffect(() => {
+    if (initialFilters && Object.keys(initialFilters).length) {
+      setFilters((f) => ({ ...f, ...initialFilters }));
+      setPresetLabel('');
+    }
+  }, [initialFilters]);
+
+  // Human-readable summary of a geographic seed, for the pre-fill note.
+  const seedLabel = useMemo(() => {
+    if (!initialFilters) return '';
+    if (initialFilters.dept) return `Département ${initialFilters.dept}`;
+    if (initialFilters.region) return `Région ${initialFilters.region}`;
+    if (initialFilters.city) return `Ville ${initialFilters.city}`;
+    return '';
+  }, [initialFilters]);
+
   // ---- Local file load: parse with SheetJS, enrich ONCE, keep in state. ----
   const onPick = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
@@ -458,6 +480,15 @@ export const ExtractionView: React.FC<ExtractionViewProps> = ({ initialFilters }
     return (
       <div className="space-y-6">
         <PrivacyBanner />
+        {seedLabel && (
+          <div className="flex items-center gap-2 bg-[#28B8D8]/10 border border-[#28B8D8]/30 text-[#1C8099] text-sm rounded-lg px-4 py-3">
+            <Filter size={16} className="shrink-0" />
+            <span>
+              Filtre pré-rempli : <strong>{seedLabel}</strong> — chargez le fichier
+              donateurs pour extraire.
+            </span>
+          </div>
+        )}
         <DonCard className="text-center">
           <Database size={40} className="mx-auto text-[#28B8D8] mb-3" />
           <h3 className="text-base font-bold text-gray-900 mb-1">

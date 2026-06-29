@@ -7,7 +7,7 @@ import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
 import { FranceMapView } from './FranceMapView';
 import { DonorsView } from './DonorsView';
-import { ExtractionView } from './ExtractionView';
+import { ExtractionView, ExtractionFilters } from './ExtractionView';
 import { ThemeDetail } from './ThemeDetail';
 import { DateRangeBar, DateRange } from './DateRangeBar';
 import UpdateDataModal from './UpdateDataModal';
@@ -30,6 +30,15 @@ const DonverseApp: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange | null>(null);
   const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  // Seed for the Extraction view — set when the user jumps there from the map.
+  const [extractionSeed, setExtractionSeed] = useState<Partial<ExtractionFilters> | undefined>(undefined);
+
+  // Jump to Extraction pre-filtered to a selected map zone.
+  const goExtract = useCallback((seed: Partial<ExtractionFilters>) => {
+    setExtractionSeed(seed);
+    setSelectedTheme(null);
+    setView('extraction');
+  }, []);
 
   const load = useCallback(() => {
     setError(null);
@@ -189,7 +198,7 @@ const DonverseApp: React.FC = () => {
               )
             )}
             {view === 'map' && (
-              <FranceMapView data={data} range={hasCube ? range : undefined} />
+              <FranceMapView data={data} range={hasCube ? range : undefined} onExtract={goExtract} />
             )}
             {view === 'donors' && (
               <>
@@ -201,7 +210,7 @@ const DonverseApp: React.FC = () => {
               </>
             )}
             {view === 'extraction' && (
-              <ExtractionView />
+              <ExtractionView initialFilters={extractionSeed} />
             )}
           </div>
         )}

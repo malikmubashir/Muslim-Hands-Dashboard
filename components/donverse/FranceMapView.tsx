@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
-import { MapPin, RotateCcw, Search } from 'lucide-react';
+import { MapPin, RotateCcw, Search, Users } from 'lucide-react';
 import { DonverseData } from './types';
+import type { ExtractionFilters } from './ExtractionView';
 import { DonCard, SectionTitle } from './DonCard';
 import { fmtEur, fmtEur2, fmtNum } from './format';
 import {
@@ -43,9 +44,11 @@ interface FranceMapProps {
   data: DonverseData;
   /** Active date range — when set (with cube), the choropleth is range-filtered. */
   range?: { start: string; end: string };
+  /** Jump to the Extraction tab pre-seeded with a geographic filter for this zone. */
+  onExtract?: (seed: Partial<ExtractionFilters>) => void;
 }
 
-export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
+export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract }) => {
   const [gran, setGran] = useState<Granularity>('dept');
   const [metric, setMetric] = useState<MetricKey>('amount');
   const [geo, setGeo] = useState<Record<Granularity, any>>({ dept: null, region: null, postcode: null });
@@ -609,6 +612,15 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
                       ? 'Statistiques sur la période sélectionnée.'
                       : 'Statistiques sur la période sélectionnée · localisation indisponible.'}
                   </p>
+                  {onExtract && (
+                    <button
+                      type="button"
+                      onClick={() => onExtract({ city: cityResult.name })}
+                      className="mt-3 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
+                    >
+                      <Users size={14} /> Extraire les donateurs
+                    </button>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-amber-600">{pcError}</p>
@@ -625,14 +637,31 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range }) => {
               </h3>
             </div>
             {detail ? (
-              <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-                <div><dt className="text-gray-400 text-xs">Montant</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.amount)}</dd></div>
-                <div><dt className="text-gray-400 text-xs">Nb dons</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.count)}</dd></div>
-                <div><dt className="text-gray-400 text-xs">Don moyen</dt><dd className="font-semibold text-gray-900">{fmtEur2(detail.avg)}</dd></div>
-                <div><dt className="text-gray-400 text-xs">Donateurs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.donors)}</dd></div>
-                <div><dt className="text-gray-400 text-xs">Actifs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.active)}</dd></div>
-                <div><dt className="text-gray-400 text-xs">LTV</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.ltv)}</dd></div>
-              </dl>
+              <>
+                <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
+                  <div><dt className="text-gray-400 text-xs">Montant</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.amount)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">Nb dons</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.count)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">Don moyen</dt><dd className="font-semibold text-gray-900">{fmtEur2(detail.avg)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">Donateurs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.donors)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">Actifs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.active)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">LTV</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.ltv)}</dd></div>
+                </dl>
+                {onExtract && gran !== 'postcode' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onExtract(
+                        gran === 'dept'
+                          ? { dept: detail.key }   // 2-digit dept code (feature.properties.code)
+                          : { region: detail.name } // région name (feature.properties.nom)
+                      )
+                    }
+                    className="mt-4 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
+                  >
+                    <Users size={14} /> Extraire les donateurs
+                  </button>
+                )}
+              </>
             ) : (
               <p className="text-sm text-gray-400">Les chiffres clés de la zone s'afficheront ici.</p>
             )}
