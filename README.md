@@ -1,55 +1,39 @@
-# Muslim Hands Dashboard
 
-A comprehensive donor data visualization dashboard with multi-language support (French, English, Urdu) and Gemini-powered AI analysis.
+## How to update the data
 
-## Setup & Run Locally
+Two ways, both producing the same anonymised aggregate:
 
-1.  **Install Dependencies**:
-    ```bash
-    npm install
-    ```
+- **In the app (recommended for operators).** Click **Update data** in the
+  header, select the two N3O `.xlsx` exports, and confirm. The browser parses,
+  anonymises and uploads the aggregate, and encrypts + uploads the contact
+  dataset — no personal data leaves your browser in plaintext.
 
-2.  **Environment Setup (Optional)**:
-    Create a `.env` file in the root directory:
-    ```
-    VITE_API_KEY=your_google_gemini_api_key
-    ```
-    *Note: If you do not set this, the app will ask for an API key in the interface.*
+- **From the command line (for developers).** Drop the two exports into
+  `data-source/` (gitignored) and run:
 
-3.  **Run Development Server (Web)**:
-    ```bash
-    npm run dev
-    ```
+  ```bash
+  npm run refresh          # regenerate the seed aggregate
+  npm run refresh:build    # regenerate + production build
+  ```
 
-## Building the Desktop Application (EXE / MSI)
+Full workflow: [`REFRESH-DATA.md`](REFRESH-DATA.md) and
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-To create a standalone installer for Windows:
+## Language
 
-1.  **Install Dependencies** (if you haven't already):
-    ```bash
-    npm install
-    ```
+The interface has a **French / English** toggle (`components/donverse/i18n.tsx`,
+`<LangToggle/>`). The default is French; the choice is saved in `localStorage`.
+Only the UI **chrome** is translated — data **values** from the N3O export
+(cause names, stipulations, destinations, regions, cities, segment labels) are
+kept verbatim because they double as filter keys for the donor downloads.
 
-2.  **Build the Installer**:
-    ```bash
-    npm run dist
-    ```
-    
-    This command will:
-    1. Build the React application (HTML/CSS/JS).
-    2. Package it using Electron.
-    3. Generate an installer in the `dist-electron` folder.
+## Documentation
 
-3.  **Locate the File**:
-    Go to the `dist-electron` folder. You will find:
-    - `Muslim Hands Dashboard Setup 1.0.0.exe` (Send this to users)
-    - `Muslim Hands Dashboard 1.0.0.msi` (For IT admin deployment)
-
-## Features
-
-- **Standalone Desktop App**: Installs like a native Windows application.
-- **CSV Import**: Upload donor data via CSV.
-- **Multi-language**: Toggle between French, English, and Urdu.
-- **AI Assistant**: Ask questions about your data using Google Gemini (Supports User API Key entry).
-- **Interactive Charts**: Deep dive into donation trends, geography, and project allocation.
-- **Export**: Download charts as JPG images.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — data model, the anonymised
+  cube, the aggregation pipeline, geo data.
+- [`docs/PRIVACY-AND-EXTRACTION.md`](docs/PRIVACY-AND-EXTRACTION.md) — the
+  PII / encryption / download model.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel setup, env vars, endpoints,
+  operational gotchas.
+- [`docs/N3O-INTEGRATION.md`](docs/N3O-INTEGRATION.md) — for the CRM vendor:
+  exact source columns and the path to an automatic feed.

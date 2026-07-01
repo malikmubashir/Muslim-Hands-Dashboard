@@ -4,12 +4,12 @@ import { sliceCube } from '../../services/cube';
 export type Granularity = 'dept' | 'region' | 'postcode';
 export type MetricKey = 'amount' | 'count' | 'avg' | 'donors' | 'active';
 
-export const METRICS: { key: MetricKey; label: string }[] = [
-  { key: 'amount', label: 'Montant collecté' },
-  { key: 'count', label: 'Nombre de dons' },
-  { key: 'avg', label: 'Don moyen' },
-  { key: 'donors', label: 'Donateurs' },
-  { key: 'active', label: 'Donateurs actifs' },
+export const METRICS: { key: MetricKey; label: string; labelKey: string }[] = [
+  { key: 'amount', label: 'Montant collecté', labelKey: 'map.metric.amount' },
+  { key: 'count', label: 'Nombre de dons', labelKey: 'map.metric.count' },
+  { key: 'avg', label: 'Don moyen', labelKey: 'map.metric.avg' },
+  { key: 'donors', label: 'Donateurs', labelKey: 'map.metric.donors' },
+  { key: 'active', label: 'Donateurs actifs', labelKey: 'map.metric.active' },
 ];
 
 // One consolidated record per area, keyed by dept code or region nom.

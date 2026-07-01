@@ -13,6 +13,7 @@ import {
   GREEN_RAMP, NO_DATA, DOM, normCity,
 } from './mapMetrics';
 import { sliceCube } from '../../services/cube';
+import { useT } from './i18n';
 
 const fmtMetric = (v: number, m: MetricKey): string =>
   m === 'amount' ? fmtEur(v) : m === 'avg' ? fmtEur2(v) : fmtNum(v);
@@ -49,6 +50,7 @@ interface FranceMapProps {
 }
 
 export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract }) => {
+  const { t } = useT();
   const [gran, setGran] = useState<Granularity>('dept');
   const [metric, setMetric] = useState<MetricKey>('amount');
   const [geo, setGeo] = useState<Record<Granularity, any>>({ dept: null, region: null, postcode: null });
@@ -181,7 +183,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
         const display: AreaRow = { ...row, name };
         const v = metricValue(display, metric);
         lyr.bindTooltip(
-          `<strong>${name}</strong><br/>${METRICS.find((mm) => mm.key === metric)!.label} : ${fmtMetric(v, metric)}`,
+          `<strong>${name}</strong><br/>${t(METRICS.find((mm) => mm.key === metric)!.labelKey)} : ${fmtMetric(v, metric)}`,
           { sticky: true }
         );
         lyr.on({
@@ -327,7 +329,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
     const key = normCity(rawName);
     const stats = cityStats.get(key);
     if (!stats) {
-      setPcError('Aucune donnée pour cette ville sur la période.');
+      setPcError(t('map.noCityData'));
       return;
     }
     const c = cityCentroids?.[key];
@@ -335,7 +337,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
     if (c) {
       dropMarker(
         c[0], c[1],
-        `<strong>${stats.name}</strong><br/>Montant collecté : ${fmtEur(stats.value)}<br/>Nombre de dons : ${fmtNum(stats.count)}`,
+        `<strong>${stats.name}</strong><br/>${t('map.amountCollected')} : ${fmtEur(stats.value)}<br/>${t('kpi.numDonations')} : ${fmtNum(stats.count)}`,
       );
     }
   };
@@ -363,7 +365,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
         stats = candidates[0];
       }
       if (!stats) {
-        setPcError('Aucune donnée pour cette ville sur la période.');
+        setPcError(t('map.noCityData'));
         return;
       }
       locateCity(stats.name);
@@ -373,7 +375,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
     // Postcode branch: full-period stats from postcodeGlobal.
     const row = (data.postcodeGlobal?.byPostcode ?? []).find((r) => r.postcode === q);
     if (!row) {
-      setPcError('Aucune donnée pour ce code postal (moins de 5 donateurs, ou code absent des dons).');
+      setPcError(t('map.noPcData'));
       return;
     }
     setPcResult({ postcode: row.postcode, value: row.value, count: row.count });
@@ -381,7 +383,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
     if (map && c) {
       dropMarker(
         c[0], c[1],
-        `<strong>${q}</strong><br/>Montant collecté : ${fmtEur(row.value)}<br/>Nombre de dons : ${fmtNum(row.count)}`,
+        `<strong>${q}</strong><br/>${t('map.amountCollected')} : ${fmtEur(row.value)}<br/>${t('kpi.numDonations')} : ${fmtNum(row.count)}`,
       );
     }
   };
@@ -447,7 +449,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
     return DOM.map((d) => ({ ...d, row: idxDept.get(d.code) }));
   }, [data, range]);
 
-  const metricLabel = METRICS.find((m) => m.key === metric)!.label;
+  const metricLabel = t(METRICS.find((m) => m.key === metric)!.labelKey);
 
   return (
     <div className="space-y-4">
@@ -462,20 +464,20 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                 gran === g ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {g === 'dept' ? 'Départements' : g === 'region' ? 'Régions' : 'Code postal (carte de chaleur)'}
+              {g === 'dept' ? t('map.departments') : g === 'region' ? t('map.regions') : t('map.postcode')}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">Indicateur :</span>
+          <span className="text-sm text-gray-500">{t('map.indicator')}</span>
           <select
             value={metric}
             onChange={(e) => setMetric(e.target.value as MetricKey)}
             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             {METRICS.map((m) => (
-              <option key={m.key} value={m.key}>{m.label}</option>
+              <option key={m.key} value={m.key}>{t(m.labelKey)}</option>
             ))}
           </select>
         </div>
@@ -485,13 +487,13 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
             onClick={() => setSelected(null)}
             className="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-emerald-700 px-3 py-1.5 rounded-lg border border-gray-200 bg-white"
           >
-            <RotateCcw size={14} /> Réinitialiser
+            <RotateCcw size={14} /> {t('map.reset')}
           </button>
         )}
 
         {range && gran !== 'postcode' && (
           <span className="ml-auto text-xs text-gray-400">
-            Choroplèthe filtré par la période sélectionnée
+            {t('map.choroplethNote')}
           </span>
         )}
       </div>
@@ -506,17 +508,17 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
             type="text"
             value={pcQuery}
             onChange={(e) => setPcQuery(e.target.value)}
-            placeholder="Code postal ou ville (ex. 75011 ou Marseille)"
+            placeholder={t('map.search.placeholder')}
             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64"
           />
           <button
             type="submit"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-3 py-1.5 transition-colors"
           >
-            <Search size={14} /> Rechercher
+            <Search size={14} /> {t('map.search.btn')}
           </button>
           <span className="text-xs text-gray-400">
-            Code postal : année complète · Ville : période sélectionnée.
+            {t('map.search.hint')}
           </span>
         </form>
       )}
@@ -530,23 +532,23 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
 
           {/* Legend */}
           <DonCard>
-            <SectionTitle sub={metricLabel}>Légende</SectionTitle>
+            <SectionTitle sub={metricLabel}>{t('map.legend')}</SectionTitle>
             {gran === 'postcode' ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-3 text-xs text-gray-600">
-                  <span>faible</span>
+                  <span>{t('map.low')}</span>
                   <span
                     className="inline-block h-3 flex-1 rounded"
                     style={{ background: 'linear-gradient(to right, #C8F1F8, #6FD9E9, #28B8D8, #15677A)' }}
                   />
-                  <span>élevé</span>
+                  <span>{t('map.high')}</span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Carte de chaleur par code postal · les zones de moins de{' '}
-                  {data.meta.suppressMinDonors ?? 5} donateurs sont masquées.
+                  {t('map.pcHeatPre')}{' '}
+                  {data.meta.suppressMinDonors ?? 5} {t('map.pcHeatPost')}
                 </p>
                 <p className="text-xs text-gray-400">
-                  Carte de chaleur sur l’année complète (non filtrée par la période).
+                  {t('map.heatFullYear')}
                 </p>
               </div>
             ) : (
@@ -559,7 +561,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                 ))}
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="inline-block w-4 h-4 rounded" style={{ background: NO_DATA }} />
-                  Aucune donnée
+                  {t('map.noData')}
                 </div>
               </div>
             )}
@@ -575,42 +577,42 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                 <Search size={16} className="text-emerald-600" />
                 <h3 className="text-sm font-semibold text-gray-800">
                   {pcResult
-                    ? `Code postal ${pcResult.postcode}`
+                    ? `${t('map.postcodeLabel')} ${pcResult.postcode}`
                     : cityResult
-                    ? `Ville : ${cityResult.name}`
-                    : 'Recherche'}
+                    ? `${t('map.cityLabel')} : ${cityResult.name}`
+                    : t('map.search')}
                 </h3>
               </div>
               {pcResult ? (
                 <>
                   <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                     <div>
-                      <dt className="text-gray-400 text-xs">Montant collecté</dt>
+                      <dt className="text-gray-400 text-xs">{t('map.amountCollected')}</dt>
                       <dd className="font-semibold text-gray-900">{fmtEur(pcResult.value)}</dd>
                     </div>
                     <div>
-                      <dt className="text-gray-400 text-xs">Nombre de dons</dt>
+                      <dt className="text-gray-400 text-xs">{t('kpi.numDonations')}</dt>
                       <dd className="font-semibold text-gray-900">{fmtNum(pcResult.count)}</dd>
                     </div>
                   </dl>
-                  <p className="mt-3 text-xs text-gray-400">Statistiques sur l’année complète.</p>
+                  <p className="mt-3 text-xs text-gray-400">{t('map.fullYearStats')}</p>
                 </>
               ) : cityResult ? (
                 <>
                   <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
                     <div>
-                      <dt className="text-gray-400 text-xs">Montant collecté</dt>
+                      <dt className="text-gray-400 text-xs">{t('map.amountCollected')}</dt>
                       <dd className="font-semibold text-gray-900">{fmtEur(cityResult.value)}</dd>
                     </div>
                     <div>
-                      <dt className="text-gray-400 text-xs">Nombre de dons</dt>
+                      <dt className="text-gray-400 text-xs">{t('kpi.numDonations')}</dt>
                       <dd className="font-semibold text-gray-900">{fmtNum(cityResult.count)}</dd>
                     </div>
                   </dl>
                   <p className="mt-3 text-xs text-gray-400">
                     {cityResult.located
-                      ? 'Statistiques sur la période sélectionnée.'
-                      : 'Statistiques sur la période sélectionnée · localisation indisponible.'}
+                      ? t('map.periodStats')
+                      : t('map.periodStatsNoLoc')}
                   </p>
                   {onExtract && (
                     <button
@@ -618,7 +620,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                       onClick={() => onExtract({ city: cityResult.name })}
                       className="mt-3 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
                     >
-                      <Users size={14} /> Télécharger les donateurs
+                      <Users size={14} /> {t('common.downloadDonors')}
                     </button>
                   )}
                 </>
@@ -633,17 +635,17 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
             <div className="flex items-center gap-2 mb-3">
               <MapPin size={16} className="text-emerald-600" />
               <h3 className="text-sm font-semibold text-gray-800">
-                {detail ? `Détail : ${detail.name}` : 'Survolez ou cliquez une zone'}
+                {detail ? `${t('map.detail')} : ${detail.name}` : t('map.hoverZone')}
               </h3>
             </div>
             {detail ? (
               <>
                 <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-                  <div><dt className="text-gray-400 text-xs">Montant</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.amount)}</dd></div>
-                  <div><dt className="text-gray-400 text-xs">Nb dons</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.count)}</dd></div>
-                  <div><dt className="text-gray-400 text-xs">Don moyen</dt><dd className="font-semibold text-gray-900">{fmtEur2(detail.avg)}</dd></div>
-                  <div><dt className="text-gray-400 text-xs">Donateurs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.donors)}</dd></div>
-                  <div><dt className="text-gray-400 text-xs">Actifs</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.active)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">{t('map.amount')}</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.amount)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">{t('map.numDonations')}</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.count)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">{t('map.avgGift')}</dt><dd className="font-semibold text-gray-900">{fmtEur2(detail.avg)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">{t('map.donors')}</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.donors)}</dd></div>
+                  <div><dt className="text-gray-400 text-xs">{t('map.active')}</dt><dd className="font-semibold text-gray-900">{fmtNum(detail.active)}</dd></div>
                   <div><dt className="text-gray-400 text-xs">LTV</dt><dd className="font-semibold text-gray-900">{fmtEur(detail.ltv)}</dd></div>
                 </dl>
                 {onExtract && gran !== 'postcode' && (
@@ -658,19 +660,19 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                     }
                     className="mt-4 inline-flex items-center gap-1.5 w-full justify-center text-sm font-medium text-white bg-[#28B8D8] hover:bg-[#1C8099] rounded-lg px-3 py-2 transition-colors"
                   >
-                    <Users size={14} /> Télécharger les donateurs
+                    <Users size={14} /> {t('common.downloadDonors')}
                   </button>
                 )}
               </>
             ) : (
-              <p className="text-sm text-gray-400">Les chiffres clés de la zone s'afficheront ici.</p>
+              <p className="text-sm text-gray-400">{t('map.zoneHint')}</p>
             )}
           </DonCard>
 
           {/* Top 10 ranking */}
           <DonCard>
             <SectionTitle sub={metricLabel}>
-              {gran === 'dept' ? 'Top 10 départements' : gran === 'region' ? 'Top 10 régions' : 'Top 10 codes postaux'}
+              {gran === 'dept' ? t('map.top10depts') : gran === 'region' ? t('map.top10regions') : t('map.top10postcodes')}
             </SectionTitle>
             <ol className="space-y-1.5">
               {gran === 'postcode'
@@ -696,7 +698,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                             type="button"
                             onClick={() => onExtract(gran === 'dept' ? { dept: x.row.key } : { region: x.row.name })}
                             className="inline-flex items-center text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/30 hover:border-[#28B8D8] rounded-md p-1 transition-colors"
-                            title={`Télécharger les donateurs : ${x.row.name} (période en cours)`}
+                            title={`${t('common.downloadDonors')} : ${x.row.name}`}
                           >
                             <Download size={13} />
                           </button>
@@ -710,8 +712,8 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
           {/* Top 10 villes (postcode mode, date-filtered) */}
           {gran === 'postcode' && (
             <DonCard>
-              <SectionTitle sub="Montant collecté · période sélectionnée">
-                Top 10 villes
+              <SectionTitle sub={t('map.top10citiesSub')}>
+                {t('map.top10cities')}
               </SectionTitle>
               {top10Cities.length ? (
                 <ol className="space-y-1.5">
@@ -732,7 +734,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                             type="button"
                             onClick={() => onExtract({ city: c.name })}
                             className="inline-flex items-center text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/30 hover:border-[#28B8D8] rounded-md p-1 transition-colors"
-                            title={`Télécharger les donateurs : ${c.name} (période en cours)`}
+                            title={`${t('common.downloadDonors')} : ${c.name}`}
                           >
                             <Download size={13} />
                           </button>
@@ -742,7 +744,7 @@ export const FranceMapView: React.FC<FranceMapProps> = ({ data, range, onExtract
                   ))}
                 </ol>
               ) : (
-                <p className="text-sm text-gray-400">Aucune ville sur la période sélectionnée.</p>
+                <p className="text-sm text-gray-400">{t('map.noCityPeriod')}</p>
               )}
             </DonCard>
           )}

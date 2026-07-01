@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { Download, FileImage, FileText, Loader2 } from 'lucide-react';
+import { useT } from './i18n';
 
 // Sanitize a string into a safe file-name fragment.
 const slug = (s: string) =>
@@ -45,6 +46,7 @@ interface ExportButtonsProps {
 
 /** Small PNG / PDF export buttons for a chart Card header. */
 export const ExportButtons: React.FC<ExportButtonsProps> = ({ targetRef, name }) => {
+  const { t } = useT();
   const [busy, setBusy] = useState<null | 'png' | 'pdf'>(null);
   const base = slug(name);
 
@@ -86,11 +88,11 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({ targetRef, name })
 
   return (
     <div className="flex items-center gap-1.5 shrink-0" data-html2canvas-ignore="true">
-      <button type="button" onClick={exportPng} disabled={!!busy} className={btn} title="Télécharger en PNG">
+      <button type="button" onClick={exportPng} disabled={!!busy} className={btn} title={t('exp.png')}>
         {busy === 'png' ? <Loader2 size={13} className="animate-spin" /> : <FileImage size={13} />}
         PNG
       </button>
-      <button type="button" onClick={exportPdf} disabled={!!busy} className={btn} title="Télécharger en PDF">
+      <button type="button" onClick={exportPdf} disabled={!!busy} className={btn} title={t('exp.pdf')}>
         {busy === 'pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
         PDF
       </button>

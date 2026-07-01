@@ -7,6 +7,7 @@ import { encryptJSON } from '../../services/cryptoStore';
 import {
   uploadDataset, uploadExtractionCiphertext, getStoredPassword, DEV_BYPASS,
 } from '../../services/donverseClient';
+import { useT } from './i18n';
 
 interface Props {
   onClose: () => void;
@@ -44,6 +45,7 @@ function rowsOf(wb: XLSX.WorkBook, hint: string): any[] {
 }
 
 const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
+  const { t } = useT();
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string>('');
@@ -59,13 +61,13 @@ const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
   const process = useCallback(async () => {
     setError(null);
     if (files.length < 2) {
-      setError('Sélectionnez les DEUX fichiers Excel (transactions + donateurs).');
+      setError(t('modal.needTwo'));
       return;
     }
     setBusy(true);
     try {
       // 1) Read both files as ArrayBuffers and parse headers to assign roles.
-      setPhase('Lecture des fichiers…');
+      setPhase(t('modal.phase.reading'));
       let txWb: XLSX.WorkBook | null = null;
       let donorWb: XLSX.WorkBook | null = null;
       for (const f of files) {
@@ -76,29 +78,25 @@ const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
         else if (role === 'donor' && !donorWb) donorWb = wb;
       }
       if (!txWb || !donorWb) {
-        throw new Error(
-          'Impossible d’identifier les deux fichiers. Vérifiez qu’il s’agit bien des exports N3O ' +
-          '(transactions: colonnes « Donation Amount (Base) », « Fund Dimension 2 », « Postal Code » ; ' +
-          'donateurs: « Total Donation Amount », « Maximum Donation Date »).'
-        );
+        throw new Error(t('modal.cantId'));
       }
 
       // 2) Full parse to row objects (the heavy step for ~160k rows).
-      setPhase('Traitement en cours… (cela peut prendre quelques secondes)');
+      setPhase(t('modal.phase.processing'));
       // Yield to the browser so the spinner can paint before the blocking parse.
       await new Promise((r) => setTimeout(r, 50));
       const txRows = rowsOf(txWb, 'dashboard');
       const donorRows = rowsOf(donorWb, 'donateurs');
 
       // 3) Aggregate + anonymize entirely in the browser. PII never leaves here.
-      setPhase('Anonymisation des données…');
+      setPhase(t('modal.phase.anon'));
       const data = aggregateDonverse(txRows, donorRows, {
         sources: files.map((f) => f.name),
         generatedAt: new Date().toISOString(),
       });
 
       // 4) Upload ONLY the anonymized aggregate (no contact PII).
-      setPhase('Envoi des données anonymisées…');
+      setPhase(t('modal.phase.upload'));
       await uploadDataset(data);
 
       // 5) Build the COMBINED donor+transaction extraction dataset (PII), then
@@ -108,7 +106,7 @@ const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
       if (!DEV_BYPASS) {
         const pw = getStoredPassword() || '';
         if (pw) {
-          setPhase('Chiffrement et enregistrement de l’extraction…');
+          setPhase(t('modal.phase.encrypt'));
           await new Promise((r) => setTimeout(r, 50)); // let the phase paint
           const extraction = buildExtractionData(txRows, donorRows);
           const ciphertext = await encryptJSON(extraction, pw);
@@ -124,7 +122,7 @@ const UpdateDataModal: React.FC<Props> = ({ onClose, onUpdated }) => {
       setBusy(false);
       setPhase('');
     }
-  }, [files, onUpdated]);
+  }, [files, onUpdated, t]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">

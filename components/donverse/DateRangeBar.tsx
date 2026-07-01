@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarRange } from 'lucide-react';
 import { fmtDate } from './format';
+import { useT } from './i18n';
 
 export interface DateRange { start: string; end: string; }
 
@@ -28,6 +29,7 @@ const minISO = (a: string, b: string) => (a <= b ? a : b);
  * plus quick presets. Guards start <= end (clamps the other edge if violated).
  */
 export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, range, onChange }) => {
+  const { t } = useT();
   // Clamp a value into [dateMin, dateMax].
   const clamp = (v: string) => minISO(maxISO(v, dateMin), dateMax);
 
@@ -62,11 +64,11 @@ export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, ra
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-3">
       <div className="flex items-center gap-2 text-gray-700">
         <CalendarRange size={16} className="text-emerald-600" />
-        <span className="text-sm font-semibold">Période</span>
+        <span className="text-sm font-semibold">{t('date.period')}</span>
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-xs text-gray-500">Du</label>
+        <label className="text-xs text-gray-500">{t('date.from')}</label>
         <input
           type="date"
           value={range.start}
@@ -75,7 +77,7 @@ export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, ra
           onChange={(e) => setStart(e.target.value)}
           className={inputCls}
         />
-        <label className="text-xs text-gray-500">Au</label>
+        <label className="text-xs text-gray-500">{t('date.to')}</label>
         <input
           type="date"
           value={range.end}
@@ -92,7 +94,7 @@ export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, ra
           onClick={() => onChange(presetAll)}
           className={presetBtn + (presetActive(presetAll) ? presetOn : presetOff)}
         >
-          Toute la période
+          {t('date.all')}
         </button>
         {preset2025.start <= preset2025.end && (
           <button
@@ -108,7 +110,7 @@ export const DateRangeBar: React.FC<DateRangeBarProps> = ({ dateMin, dateMax, ra
           onClick={() => onChange(preset3m)}
           className={presetBtn + (presetActive(preset3m) ? presetOn : presetOff)}
         >
-          3 derniers mois
+          {t('date.last3m')}
         </button>
       </div>
 

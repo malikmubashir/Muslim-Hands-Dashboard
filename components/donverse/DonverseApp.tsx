@@ -17,14 +17,16 @@ import {
 } from '../../services/donverseClient';
 import { sliceCube } from '../../services/cube';
 import { ExtractionFilters, downloadDonorsForSlice } from '../../lib/extractionExport';
+import { useT, LangToggle } from './i18n';
 
-const TABS: { key: DonverseView; label: string; icon: LucideIcon }[] = [
-  { key: 'overview', label: 'Tableau de bord', icon: LayoutDashboard },
-  { key: 'map', label: 'Carte de France', icon: MapIcon },
-  { key: 'donors', label: 'Donateurs', icon: Users },
+const TABS: { key: DonverseView; labelKey: string; icon: LucideIcon }[] = [
+  { key: 'overview', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { key: 'map', labelKey: 'nav.map', icon: MapIcon },
+  { key: 'donors', labelKey: 'nav.donors', icon: Users },
 ];
 
 const DonverseApp: React.FC = () => {
+  const { t, lang } = useT();
   // ---- Shared-password gate (whole app) ----
   // In dev we bypass entirely; in prod we require a valid session password.
   const [unlocked, setUnlocked] = useState<boolean>(DEV_BYPASS);
@@ -56,18 +58,18 @@ const DonverseApp: React.FC = () => {
       // fetch+decrypt once, with a clear "preparing" message.
       let recs = records;
       if (!recs) {
-        setToast('Préparation des données de contact…');
+        setToast(t('toast.preparingContacts'));
         recs = await getExtractionRecords();
         setRecords(recs);
       }
       if (!recs.length) {
-        setToast('Aucune donnée de contact disponible. Mettez à jour les données.');
+        setToast(t('toast.noContacts'));
       } else {
         const n = downloadDonorsForSlice(recs, seed, range);
-        setToast(n > 0 ? `${n.toLocaleString('fr-FR')} donateurs téléchargés (Excel).` : 'Aucun donateur pour cette sélection.');
+        setToast(n > 0 ? `${n.toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR')} ${t('toast.downloaded')}` : t('toast.noneSelection'));
       }
     } catch {
-      setToast('Échec du téléchargement.');
+      setToast(t('toast.failed'));
     } finally {
       setExporting(false);
       setTimeout(() => setToast(null), 4000);
@@ -82,18 +84,18 @@ const DonverseApp: React.FC = () => {
     try {
       let recs = records;
       if (!recs) {
-        setToast('Préparation des données de contact…');
+        setToast(t('toast.preparingContacts'));
         recs = await getExtractionRecords();
         setRecords(recs);
       }
       if (!recs.length) {
-        setToast('Aucune donnée de contact disponible. Mettez à jour les données.');
+        setToast(t('toast.noContacts'));
       } else {
         const n = downloadDonorsForSlice(recs, seed, { start: '', end: '' }, { allTime: true });
-        setToast(n > 0 ? `${n.toLocaleString('fr-FR')} donateurs téléchargés (Excel).` : 'Aucun donateur pour cette sélection.');
+        setToast(n > 0 ? `${n.toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR')} ${t('toast.downloaded')}` : t('toast.noneSelection'));
       }
     } catch {
-      setToast('Échec du téléchargement.');
+      setToast(t('toast.failed'));
     } finally {
       setExporting(false);
       setTimeout(() => setToast(null), 4000);
@@ -169,18 +171,19 @@ const DonverseApp: React.FC = () => {
 
   const onUpdated = useCallback(() => {
     setShowUpdate(false);
-    setToast('Données mises à jour.');
+    setToast(t('toast.dataUpdated'));
     load();
     setTimeout(() => setToast(null), 3500);
   }, [load]);
 
   // Friendly data-source label.
   const dataLabel = (() => {
-    if (!meta) return 'Données 2025 · anonymisées';
+    const loc = lang === 'en' ? 'en-US' : 'fr-FR';
+    if (!meta) return t('header.dataRef');
     const d = meta.lastUpdated ? new Date(meta.lastUpdated) : null;
-    const when = d && !isNaN(d.getTime()) ? d.toLocaleDateString('fr-FR') : '';
-    if (meta.source === 'uploaded') return `Données : mises à jour le ${when}`;
-    return `Données de référence (2025)${when ? ' · ' + when : ''}`;
+    const when = d && !isNaN(d.getTime()) ? d.toLocaleDateString(loc) : '';
+    if (meta.source === 'uploaded') return `${t('header.dataUpdated')} ${when}`;
+    return `${t('header.dataRef')}${when ? ' · ' + when : ''}`;
   })();
 
   const months = data?.months || [];
@@ -193,8 +196,8 @@ const DonverseApp: React.FC = () => {
   const themeShare = useMemo(() => {
     if (!data || !range || !selectedTheme) return 0;
     const all = sliceCube(data, range);
-    const t = all.byTheme.find((x) => x.name === selectedTheme);
-    return all.total && t ? t.value / all.total : 0;
+    const th = all.byTheme.find((x) => x.name === selectedTheme);
+    return all.total && th ? th.value / all.total : 0;
   }, [data, range, selectedTheme]);
 
   // ---- Gate rendering (prod only) ----
@@ -227,10 +230,11 @@ const DonverseApp: React.FC = () => {
             />
             <div>
               <h1 className="text-xl font-bold leading-tight tracking-tight text-white">Muslim Hands France</h1>
-              <p className="text-white/80 text-sm">Console de pilotage des collectes</p>
+              <p className="text-white/80 text-sm">{t('header.subtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto">
+            <LangToggle />
             <span className="text-xs font-medium text-white bg-white/20 rounded-full px-3 py-1">
               {dataLabel}
             </span>
@@ -239,7 +243,7 @@ const DonverseApp: React.FC = () => {
               className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors"
             >
               <RefreshCw size={14} />
-              Mettre à jour
+              {t('header.update')}
             </button>
           </div>
         </div>
@@ -247,13 +251,13 @@ const DonverseApp: React.FC = () => {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <nav className="flex gap-1">
-            {TABS.map((t) => {
-              const Icon = t.icon;
-              const active = view === t.key;
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = view === tab.key;
               return (
                 <button
-                  key={t.key}
-                  onClick={() => { setView(t.key); setSelectedTheme(null); }}
+                  key={tab.key}
+                  onClick={() => { setView(tab.key); setSelectedTheme(null); }}
                   className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     active
                       ? 'border-white text-white'
@@ -261,7 +265,7 @@ const DonverseApp: React.FC = () => {
                   }`}
                 >
                   <Icon size={16} />
-                  {t.label}
+                  {t(tab.labelKey)}
                 </button>
               );
             })}
@@ -274,14 +278,14 @@ const DonverseApp: React.FC = () => {
         {error && (
           <div className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl p-4">
             <AlertTriangle size={20} />
-            <span>Impossible de charger les données : {error}</span>
+            <span>{t('common.loadError')} {error}</span>
           </div>
         )}
 
         {!error && !data && (
           <div className="flex items-center justify-center gap-3 text-gray-500 py-32">
             <Loader2 size={22} className="animate-spin" />
-            Chargement des données…
+            {t('common.loading')}
           </div>
         )}
 
@@ -317,7 +321,7 @@ const DonverseApp: React.FC = () => {
               <>
                 <div className="flex items-center gap-2 text-xs text-gray-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                   <Info size={14} className="text-blue-500 shrink-0" />
-                  Instantané, non filtré par date. Les téléchargements couvrent toute la base.
+                  {t('dn.snapshotNote')}
                 </div>
                 <DonorsView data={data} onExtract={extractDonors} />
               </>
@@ -330,8 +334,8 @@ const DonverseApp: React.FC = () => {
         <img src="/brand/mhf-logo.png" className="h-8" alt="Muslim Hands France" />
         {data && (
           <p>
-            Source : {data.meta.sources.join(', ')} · Généré le{' '}
-            {new Date(data.meta.generatedAt).toLocaleDateString('fr-FR')} · Devise {data.meta.currency}
+            {t('foot.source')} : {data.meta.sources.join(', ')} · {t('foot.generatedOn')}{' '}
+            {new Date(data.meta.generatedAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR')} · {t('foot.currency')} {data.meta.currency}
           </p>
         )}
       </footer>
@@ -351,12 +355,13 @@ const DonverseApp: React.FC = () => {
 };
 
 // Shown if the loaded dataset predates the cube (no month×theme breakdowns).
-const LegacyNotice: React.FC = () => (
-  <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
-    Ce jeu de données ne contient pas le cube (mois × thème) requis pour le filtre
-    par période et l’exploration par cause. Mettez à jour les données pour activer
-    ces fonctionnalités.
-  </div>
-);
+const LegacyNotice: React.FC = () => {
+  const { t } = useT();
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-500">
+      {t('legacy.notice')}
+    </div>
+  );
+};
 
 export default DonverseApp;

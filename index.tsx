@@ -3,6 +3,7 @@ import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import DonverseApp from './components/donverse/DonverseApp';
+import { LangProvider } from './components/donverse/i18n';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -12,6 +13,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <DonverseApp />
+    <LangProvider>
+      <DonverseApp />
+    </LangProvider>
   </React.StrictMode>
 );

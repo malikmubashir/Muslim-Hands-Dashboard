@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Loader2, AlertTriangle } from 'lucide-react';
 import { checkPassword, setStoredPassword } from '../../services/donverseClient';
+import { useT } from './i18n';
 
 interface Props {
   onUnlock: () => void;
@@ -14,6 +15,7 @@ interface Props {
  * Brand: Muslim Hands France turquoise (#28B8D8 → #1C8099).
  */
 const PasswordGate: React.FC<Props> = ({ onUnlock }) => {
+  const { t, lang, setLang } = useT();
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,10 +31,10 @@ const PasswordGate: React.FC<Props> = ({ onUnlock }) => {
         setStoredPassword(pw);
         onUnlock();
       } else {
-        setError('Mot de passe incorrect.');
+        setError(t('gate.wrong'));
       }
     } catch {
-      setError('Impossible de vérifier le mot de passe. Réessayez.');
+      setError(lang === 'en' ? 'Could not verify the password. Please try again.' : 'Impossible de vérifier le mot de passe. Réessayez.');
     } finally {
       setBusy(false);
     }
@@ -47,6 +49,15 @@ const PasswordGate: React.FC<Props> = ({ onUnlock }) => {
         onSubmit={submit}
         className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8"
       >
+        <div className="flex justify-end -mt-2 -mr-2 mb-1">
+          <button
+            type="button"
+            onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}
+            className="text-xs font-semibold text-gray-400 hover:text-gray-700 border border-gray-200 rounded-full px-2.5 py-1"
+          >
+            {lang === 'fr' ? 'EN' : 'FR'}
+          </button>
+        </div>
         <div className="flex flex-col items-center text-center mb-6">
           <img
             src="/brand/mhf-mark.png"
@@ -55,11 +66,11 @@ const PasswordGate: React.FC<Props> = ({ onUnlock }) => {
             onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/brand/mhf-mark-white.png'; }}
           />
           <h1 className="text-lg font-bold text-gray-900">Muslim Hands France</h1>
-          <p className="text-sm text-gray-500">Console de pilotage — accès équipe</p>
+          <p className="text-sm text-gray-500">{t('gate.subtitle')}</p>
         </div>
 
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Mot de passe de l’équipe
+          {t('gate.password')}
         </label>
         <div className="relative">
           <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -88,11 +99,11 @@ const PasswordGate: React.FC<Props> = ({ onUnlock }) => {
           style={{ backgroundColor: '#1C8099' }}
         >
           {busy && <Loader2 size={16} className="animate-spin" />}
-          {busy ? 'Vérification…' : 'Accéder'}
+          {busy ? t('gate.checking') : t('gate.enter')}
         </button>
 
         <p className="text-xs text-gray-400 mt-4 text-center">
-          Le mot de passe est conservé uniquement pour cette session.
+          {t('gate.sessionNote')}
         </p>
       </form>
     </div>

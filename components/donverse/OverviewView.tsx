@@ -14,6 +14,7 @@ import { sliceCube } from '../../services/cube';
 import type { DateRange } from './DateRangeBar';
 import type { ExtractionFilters } from '../../lib/extractionExport';
 import { fmtEur, fmtEur2, fmtNum, fmtPct, fmtEurShort, fmtMonth, fmtMonthShort, MH, paletteAt } from './format';
+import { useT } from './i18n';
 
 interface OverviewProps {
   data: DonverseData;
@@ -26,21 +27,25 @@ interface OverviewProps {
 }
 
 // Small inline "download these donors" icon button (per row / per slice).
-const DlBtn: React.FC<{ onClick: (e: React.MouseEvent) => void; label?: string }> = ({ onClick, label }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/40 hover:border-[#28B8D8] rounded-md px-2 py-1 transition-colors shrink-0"
-    title="Télécharger les donateurs de cette sélection (période en cours)"
-  >
-    <Download size={13} /> {label ?? 'Télécharger'}
-  </button>
-);
+const DlBtn: React.FC<{ onClick: (e: React.MouseEvent) => void; label?: string }> = ({ onClick, label }) => {
+  const { t } = useT();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1C8099] hover:text-white hover:bg-[#28B8D8] border border-[#28B8D8]/40 hover:border-[#28B8D8] rounded-md px-2 py-1 transition-colors shrink-0"
+      title={t('common.downloadDonors')}
+    >
+      <Download size={13} /> {label ?? t('common.download')}
+    </button>
+  );
+};
 
 // Pull a category name out of a recharts click payload (Pie / Bar).
 const clickName = (d: any): string | undefined => d?.payload?.name ?? d?.name;
 
 export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectTheme, onExtract, donorsInPeriod }) => {
+  const { t } = useT();
   const s = useMemo(() => sliceCube(data, range), [data, range]);
 
   const months = useMemo(
@@ -58,50 +63,50 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
     <div className="space-y-6">
       {/* KPI row — range-aware */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Euro} label="Total collecté" value={fmtEur(s.total)} hint={`${fmtMonth(range.start)} → ${fmtMonth(range.end)}`} accent={paletteAt(0)} />
-        <KpiCard icon={Receipt} label="Nombre de dons" value={fmtNum(s.donationCount)} accent={paletteAt(1)} />
-        <KpiCard icon={TrendingUp} label="Don moyen" value={fmtEur2(s.avg)} accent={paletteAt(2)} />
-        <KpiCard icon={Users} label="Donateurs" value={fmtNum(donorsInPeriod ?? data.meta?.distinctDonors ?? data.donors.total)} hint={donorsInPeriod != null ? 'distincts sur la période' : (data.meta?.distinctDonors != null ? 'ayant donné' : 'base totale')} accent={paletteAt(3)} />
-        <KpiCard icon={HandHeart} label="Part Zakat" value={fmtPct(s.zakatShare * 100)} accent={paletteAt(4)} />
-        <KpiCard icon={CreditCard} label="Part prélèvements (PA)" value={fmtPct(s.paShare * 100)} accent={paletteAt(5)} />
-        <KpiCard icon={Sparkles} label="Top cause" value={topCause} accent={paletteAt(6)} />
-        <KpiCard icon={MapPin} label="Top destination" value={topDest} hint={topDestVal} accent={paletteAt(7)} />
+        <KpiCard icon={Euro} label={t('kpi.totalRaised')} value={fmtEur(s.total)} hint={`${fmtMonth(range.start)} → ${fmtMonth(range.end)}`} accent={paletteAt(0)} />
+        <KpiCard icon={Receipt} label={t('kpi.numDonations')} value={fmtNum(s.donationCount)} accent={paletteAt(1)} />
+        <KpiCard icon={TrendingUp} label={t('kpi.avgGift')} value={fmtEur2(s.avg)} accent={paletteAt(2)} />
+        <KpiCard icon={Users} label={t('kpi.donors')} value={fmtNum(donorsInPeriod ?? data.meta?.distinctDonors ?? data.donors.total)} hint={donorsInPeriod != null ? t('kpi.hint.distinctPeriod') : (data.meta?.distinctDonors != null ? t('kpi.hint.havingGiven') : t('kpi.hint.totalBase'))} accent={paletteAt(3)} />
+        <KpiCard icon={HandHeart} label={t('kpi.zakatShare')} value={fmtPct(s.zakatShare * 100)} accent={paletteAt(4)} />
+        <KpiCard icon={CreditCard} label={t('kpi.paShare')} value={fmtPct(s.paShare * 100)} accent={paletteAt(5)} />
+        <KpiCard icon={Sparkles} label={t('kpi.topCause')} value={topCause} accent={paletteAt(6)} />
+        <KpiCard icon={MapPin} label={t('kpi.topDest')} value={topDest} hint={topDestVal} accent={paletteAt(7)} />
       </div>
 
       {/* Clickable themes list */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">Causes / Thèmes</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Cliquez une cause pour explorer le détail, ou « Télécharger » pour exporter ses donateurs (période en cours).</p>
+            <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{t('ov.causes')}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{t('ov.causesHint')}</p>
           </div>
         </div>
         <ul className="divide-y divide-gray-50">
-          {s.byTheme.map((t, i) => {
-            const share = s.total ? (t.value / s.total) * 100 : 0;
+          {s.byTheme.map((theme, i) => {
+            const share = s.total ? (theme.value / s.total) * 100 : 0;
             return (
-              <li key={t.name} className="flex items-center gap-2">
+              <li key={theme.name} className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onSelectTheme(t.name)}
+                  onClick={() => onSelectTheme(theme.name)}
                   className="group flex-1 min-w-0 flex items-center gap-4 py-2.5 px-2 -mx-2 rounded-lg cursor-pointer hover:bg-emerald-50/60 transition-colors text-left"
                 >
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: paletteAt(i) }} />
                   <span className="flex-1 min-w-0">
                     <span className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-medium text-gray-800 truncate group-hover:text-emerald-800">{t.name}</span>
-                      <span className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">{fmtEur(t.value)}</span>
+                      <span className="text-sm font-medium text-gray-800 truncate group-hover:text-emerald-800">{theme.name}</span>
+                      <span className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">{fmtEur(theme.value)}</span>
                     </span>
                     <span className="mt-1.5 flex items-center gap-2">
                       <span className="h-2 flex-1 rounded-full bg-gray-100 overflow-hidden">
-                        <span className="block h-full rounded-full" style={{ width: `${(t.value / themeMax) * 100}%`, backgroundColor: paletteAt(i) }} />
+                        <span className="block h-full rounded-full" style={{ width: `${(theme.value / themeMax) * 100}%`, backgroundColor: paletteAt(i) }} />
                       </span>
                       <span className="text-xs text-gray-400 tabular-nums w-12 text-right">{fmtPct(share)}</span>
                     </span>
                   </span>
                   <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-600 shrink-0" />
                 </button>
-                {onExtract && <DlBtn onClick={(e) => { e.stopPropagation(); onExtract({ cause: [t.name] }); }} />}
+                {onExtract && <DlBtn onClick={(e) => { e.stopPropagation(); onExtract({ cause: [theme.name] }); }} />}
               </li>
             );
           })}
@@ -110,7 +115,7 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stipulation donut */}
-        <ChartCard title="Répartition par stipulation" sub={onExtract ? 'Cliquez une part pour télécharger ses donateurs' : 'Sadaqa / Zakat / …'} exportName="tableau-stipulation">
+        <ChartCard title={t('ov.stipTitle')} sub={onExtract ? t('ov.clickSlice') : t('ov.stipSub')} exportName="tableau-stipulation">
           <ResponsiveContainer width="100%" height={340}>
             <PieChart>
               <Pie data={s.byStipulation} dataKey="value" nameKey="name" innerRadius={70} outerRadius={120} paddingAngle={2}
@@ -122,13 +127,13 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
               <Legend wrapperStyle={{ fontSize: 12 }} />
             </PieChart>
           </ResponsiveContainer>
-          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par stipulation" items={s.byStipulation} onPick={(name) => onExtract({ stip: [name] })} />}
+          {onExtract && <CategoryDownloadBar label={t('ov.dlByStip')} items={s.byStipulation} onPick={(name) => onExtract({ stip: [name] })} />}
         </ChartCard>
 
         {/* Payment methods — highlight PA */}
         <ChartCard
-          title="Moyens de paiement"
-          sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs · PA mis en évidence' : 'Le prélèvement automatique (PA) est mis en évidence'}
+          title={t('ov.payTitle')}
+          sub={onExtract ? t('ov.payClickSub') : t('ov.paySub')}
           exportName="tableau-paiement"
           headerExtra={
             <span className="text-xs text-gray-500">PA : <span className="font-bold text-emerald-700">{fmtPct(s.paShare * 100)}</span></span>
@@ -146,12 +151,12 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par moyen de paiement" items={payments} onPick={(name) => onExtract({ pay: [name] })} />}
+          {onExtract && <CategoryDownloadBar label={t('ov.dlByPay')} items={payments} onPick={(name) => onExtract({ pay: [name] })} />}
         </ChartCard>
       </div>
 
       {/* Monthly area — full width */}
-      <ChartCard title="Évolution mensuelle" sub="Montant collecté par mois" exportName="tableau-evolution">
+      <ChartCard title={t('ov.evoTitle')} sub={t('ov.evoSub')} exportName="tableau-evolution">
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={months} margin={{ left: 4, right: 16 }}>
             <defs>
@@ -163,14 +168,14 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
             <CartesianGrid stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
             <YAxis tickFormatter={fmtEurShort} tick={{ fontSize: 11, fill: '#64748b' }} width={64} />
-            <Tooltip formatter={(v: number) => fmtEur(v)} labelFormatter={(l) => `Mois : ${l}`} />
+            <Tooltip formatter={(v: number) => fmtEur(v)} labelFormatter={(l) => `${t('ov.monthLabel')} : ${l}`} />
             <Area type="monotone" dataKey="amount" stroke={MH.green} strokeWidth={2} fill="url(#mhArea)" />
           </AreaChart>
         </ResponsiveContainer>
       </ChartCard>
 
       {/* Destinations — full width */}
-      <ChartCard title="Top destinations" sub={onExtract ? 'Cliquez une barre pour télécharger ses donateurs (top 8)' : 'Top 8 par montant collecté'} exportName="tableau-destinations">
+      <ChartCard title={t('ov.destTitle')} sub={onExtract ? t('ov.destClickSub') : t('ov.destSub')} exportName="tableau-destinations">
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={destinations} layout="vertical" margin={{ left: 10, right: 24 }}>
             <CartesianGrid horizontal={false} stroke="#f1f5f9" />
@@ -183,7 +188,7 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        {onExtract && <CategoryDownloadBar label="Télécharger les donateurs par destination" items={destinations} onPick={(name) => onExtract({ dest: [name] })} />}
+        {onExtract && <CategoryDownloadBar label={t('ov.dlByDest')} items={destinations} onPick={(name) => onExtract({ dest: [name] })} />}
       </ChartCard>
     </div>
   );
