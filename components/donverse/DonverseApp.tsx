@@ -13,7 +13,7 @@ import UpdateDataModal from './UpdateDataModal';
 import PasswordGate from './PasswordGate';
 import {
   loadDataset, LoadedDataset, DEV_BYPASS, checkPassword, getStoredPassword,
-  getExtractionRecords, type ExtractionRecord,
+  getExtractionRecords, clearExtractionCache, type ExtractionRecord,
 } from '../../services/donverseClient';
 import { sliceCube } from '../../services/cube';
 import { ExtractionFilters, downloadDonorsForSlice } from '../../lib/extractionExport';
@@ -57,7 +57,7 @@ const DonverseApp: React.FC = () => {
       // Use the warmed cache if ready (synchronous → reliable save); otherwise
       // fetch+decrypt once, with a clear "preparing" message.
       let recs = records;
-      if (!recs) {
+      if (!recs || recs.length === 0) {
         setToast(t('toast.preparingContacts'));
         recs = await getExtractionRecords();
         setRecords(recs);
@@ -83,7 +83,7 @@ const DonverseApp: React.FC = () => {
     setExporting(true);
     try {
       let recs = records;
-      if (!recs) {
+      if (!recs || recs.length === 0) {
         setToast(t('toast.preparingContacts'));
         recs = await getExtractionRecords();
         setRecords(recs);
@@ -173,8 +173,13 @@ const DonverseApp: React.FC = () => {
     setShowUpdate(false);
     setToast(t('toast.dataUpdated'));
     load();
+    // A fresh extraction blob was just stored — drop the in-memory copy and
+    // re-fetch it so downloads use the new data without a page reload.
+    clearExtractionCache();
+    setRecords(null);
+    getExtractionRecords().then((recs) => setRecords(recs)).catch(() => setRecords([]));
     setTimeout(() => setToast(null), 3500);
-  }, [load]);
+  }, [load, t]);
 
   // Friendly data-source label.
   const dataLabel = (() => {
