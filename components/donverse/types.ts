@@ -50,6 +50,7 @@ export interface DonverseData {
     txRows: number;
     txTotalBase: number;
     txDonationCount?: number; // distinct "Donation Reference" count (true # of donations)
+    distinctDonors?: number;  // distinct "Account Reference" count (donors who paid)
     donorRows: number;
     monthMin: string;
     monthMax: string;

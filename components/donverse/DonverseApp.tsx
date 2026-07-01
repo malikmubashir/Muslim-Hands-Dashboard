@@ -102,7 +102,7 @@ const DonverseApp: React.FC = () => {
 
   // Distinct donors who gave within the selected period (date-aware KPI).
   const donorsInPeriod = useMemo(() => {
-    if (!records || !range) return undefined;
+    if (!records || records.length === 0 || !range) return undefined;
     const set = new Set<string>();
     let anon = 0;
     for (const r of records) {

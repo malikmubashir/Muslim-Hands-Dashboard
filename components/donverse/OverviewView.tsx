@@ -61,7 +61,7 @@ export const OverviewView: React.FC<OverviewProps> = ({ data, range, onSelectThe
         <KpiCard icon={Euro} label="Total collecté" value={fmtEur(s.total)} hint={`${fmtMonth(range.start)} → ${fmtMonth(range.end)}`} accent={paletteAt(0)} />
         <KpiCard icon={Receipt} label="Nombre de dons" value={fmtNum(s.donationCount)} accent={paletteAt(1)} />
         <KpiCard icon={TrendingUp} label="Don moyen" value={fmtEur2(s.avg)} accent={paletteAt(2)} />
-        <KpiCard icon={Users} label="Donateurs" value={fmtNum(donorsInPeriod ?? data.donors.total)} hint={donorsInPeriod != null ? 'distincts sur la période' : 'instantané'} accent={paletteAt(3)} />
+        <KpiCard icon={Users} label="Donateurs" value={fmtNum(donorsInPeriod ?? data.meta?.distinctDonors ?? data.donors.total)} hint={donorsInPeriod != null ? 'distincts sur la période' : (data.meta?.distinctDonors != null ? 'ayant donné' : 'base totale')} accent={paletteAt(3)} />
         <KpiCard icon={HandHeart} label="Part Zakat" value={fmtPct(s.zakatShare * 100)} accent={paletteAt(4)} />
         <KpiCard icon={CreditCard} label="Part prélèvements (PA)" value={fmtPct(s.paShare * 100)} accent={paletteAt(5)} />
         <KpiCard icon={Sparkles} label="Top cause" value={topCause} accent={paletteAt(6)} />

@@ -101,6 +101,17 @@ function normSimple(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
   return t === '' ? 'Non spécifié' : t;
 }
+// Merge synonymous "unrestricted" destinations (mirror aggregateDonverse.normDest).
+const DEST_MAP: Record<string, string> = {
+  'Selon les besoins des populations': 'Où le plus utile',
+  'Selon les besoins des population': 'Où le plus utile',
+  'Selon les besoins': 'Où le plus utile',
+};
+function normDest(v: any): string {
+  const t = (v == null ? '' : String(v)).trim();
+  if (t === '') return 'Non spécifié';
+  return DEST_MAP[t] || t;
+}
 
 // ---- Donor derivation helpers (apply EXACT rules from ExtractionView) ----
 const IN_VALUES = new Set(['opt-in', 'in', 'yes', 'oui', '1', 'true']);
@@ -273,7 +284,7 @@ export function buildExtractionData(txRows: any[], donorRows: any[]): Extraction
       dt: dayStr(r['Date']),
       amt,
       stip: normStip(r['Fund Dimension 3']),
-      dest: normSimple(r['Fund Dimension 1']),
+      dest: normDest(r['Fund Dimension 1']),
       cause: normTheme(r['Fund Dimension 2']),
       pay: normPayment(r['Payment Method']),
       dept: dept || '',

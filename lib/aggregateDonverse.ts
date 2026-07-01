@@ -122,6 +122,17 @@ function normSimple(v: any): string {
   const t = (v == null ? '' : String(v)).trim();
   return t === '' ? 'Non spécifié' : t;
 }
+// Merge synonymous "unrestricted" destinations (Fund Dimension 1).
+const DEST_MAP: Record<string, string> = {
+  'Selon les besoins des populations': 'Où le plus utile',
+  'Selon les besoins des population': 'Où le plus utile',
+  'Selon les besoins': 'Où le plus utile',
+};
+function normDest(v: any): string {
+  const t = (v == null ? '' : String(v)).trim();
+  if (t === '') return 'Non spécifié';
+  return DEST_MAP[t] || t;
+}
 function normCity(v: any): string {
   const t = (v == null ? '' : String(v)).trim().toUpperCase();
   return t === '' ? 'NON SPÉCIFIÉ' : t;
@@ -270,7 +281,8 @@ export function aggregateDonverseWithExtras(
   // distinct donations, not allocation rows. Track per-day sets of distinct
   // references, plus a global set for the grand total.
   const dailyRefSets = new Map<string, Set<string>>(); // "YYYY-MM-DD" -> set of refs
-  const allRefSet = new Set<string>();                  // all distinct refs
+  const allRefSet = new Set<string>();                  // all distinct donation refs
+  const donorRefSet = new Set<string>();                // distinct Account Reference = donors who paid
 
   let txTotalBase = 0;
   let nonFranceTotal = 0;
@@ -290,10 +302,12 @@ export function aggregateDonverseWithExtras(
     txTotalBase += amount;
 
     const ref = (r['Donation Reference'] == null ? '' : String(r['Donation Reference'])).trim();
+    const acctRef = (r['Account Reference'] == null ? '' : String(r['Account Reference'])).trim();
+    if (acctRef) donorRefSet.add(acctRef);
 
     const theme = normTheme(r['Fund Dimension 2']);
     const stip = normStip(r['Fund Dimension 3']);
-    const dest = normSimple(r['Fund Dimension 1']);
+    const dest = normDest(r['Fund Dimension 1']);
     const payment = normPayment(r['Payment Method']);
     const isPA = payment === 'Direct Debit';
     const country = normSimple(r['Address Country']);
@@ -528,6 +542,7 @@ export function aggregateDonverseWithExtras(
       txRows: txRows.length,
       txTotalBase: round2(txTotalBase),
       txDonationCount: allRefSet.size,
+      distinctDonors: donorRefSet.size,
       donorRows: donorRows.length,
       monthMin: monthMin as string,
       monthMax: monthMax as string,
