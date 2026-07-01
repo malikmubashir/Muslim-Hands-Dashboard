@@ -16,6 +16,7 @@
 //   The combined donor+transaction dataset is stored ENCRYPTED via /api/extract
 //   (ciphertext only). On login we fetch the ciphertext and decrypt it in the
 //   browser with the session password, caching the result in MEMORY only.
+import { upload } from '@vercel/blob/client';
 import type { DonverseData } from '../components/donverse/types';
 import { decryptJSON, type EncryptedPayload } from './cryptoStore';
 import type { ExtractionDataset, ExtractionRecord } from '../lib/buildExtractionData';
@@ -161,36 +162,32 @@ export async function uploadDataset(data: DonverseData): Promise<{ lastUpdated: 
 // ENCRYPTED EXTRACTION (PII) DATASET
 // =====================================================================
 
-/** POST the already-encrypted ciphertext payload to /api/extract. */
+/**
+ * Upload the already-encrypted ciphertext DIRECTLY to Vercel Blob from the
+ * browser (bypasses the 4.5 MB serverless request limit — the full-base
+ * ciphertext is tens of MB). `/api/extract` only issues the upload token; the
+ * bytes go straight to Blob. The team password authorises the token.
+ */
 export async function uploadExtractionCiphertext(payload: EncryptedPayload): Promise<void> {
   const pw = getStoredPassword() || '';
-  let res: Response;
+  const body = new Blob([JSON.stringify(payload)], { type: 'application/json' });
   try {
-    res = await fetch('/api/extract', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', [HEADER]: pw },
-      body: JSON.stringify(payload),
+    await upload('extract-enc.json', body, {
+      access: 'public',              // content is AES-GCM ciphertext; URL exposes no PII
+      handleUploadUrl: '/api/extract',
+      clientPayload: pw,             // validated server-side (over HTTPS)
+      contentType: 'application/json',
+      multipart: true,               // chunked upload for the large file
     });
   } catch (e: any) {
-    throw new Error('Connexion au serveur impossible (réseau). ' + (e?.message || ''));
-  }
-  if (res.status === 401) {
-    const err: any = new Error('Mot de passe incorrect.');
-    err.code = 401;
-    throw err;
-  }
-  const raw = await res.text();
-  let json: any = {};
-  try { json = raw ? JSON.parse(raw) : {}; } catch { /* non-JSON error page */ }
-  if (!res.ok || json.ok === false) {
-    const detail = json.error || (raw ? raw.slice(0, 180) : '');
-    throw new Error(`Échec de l’enregistrement de l’extraction (HTTP ${res.status}). ${detail}`.trim());
+    throw new Error('Échec de l’enregistrement de l’extraction : ' + (e?.message || String(e)));
   }
 }
 
 /**
- * Fetch the stored ciphertext payload from /api/extract.
- * Returns null if no extraction has been stored yet (404).
+ * Fetch the stored ciphertext payload. `/api/extract` (GET) returns the Blob
+ * URL (authed); the browser then downloads the ciphertext directly from Blob
+ * (also bypassing the 4.5 MB response limit). Returns null if none stored yet.
  */
 export async function loadExtractionCiphertext(): Promise<EncryptedPayload | null> {
   const pw = getStoredPassword() || '';
@@ -206,7 +203,11 @@ export async function loadExtractionCiphertext(): Promise<EncryptedPayload | nul
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  return (json?.payload as EncryptedPayload) ?? null;
+  const url = json?.url as string | undefined;
+  if (!url) return null;
+  const blobRes = await fetch(url, { cache: 'no-store' });
+  if (!blobRes.ok) throw new Error(`Blob HTTP ${blobRes.status}`);
+  return (await blobRes.json()) as EncryptedPayload;
 }
 
 // In-memory cache of the decrypted extraction dataset. NOT persisted to
