@@ -4,17 +4,18 @@ import { processWebhookEvent } from '../../lib/webhookProcessor';
 
 /**
  * Cron job to process queued webhook events
- * Runs every 10 seconds via Vercel Cron
+ * Runs once daily at 21:00 UTC (23:00 Paris CEST / 22:00 CET) via Vercel Cron.
+ * Vercel Hobby plan allows one cron invocation per day; the trigger may fire
+ * within the hour following the scheduled time.
  *
- * Vercel Cron configuration in vercel.json:
- * Add to crons array:
+ * Configured in vercel.json:
  * {
  *   "path": "/api/cron/process-webhooks",
- *   "schedule": "<every 10 seconds>"
+ *   "schedule": "0 21 * * *"
  * }
  *
- * Schedule format (crontab syntax):
- * Every 10 seconds, Every 5 seconds, Every 1 minute
+ * The endpoint drains the full day's queue in one batch (up to
+ * maxEventsPerRun events, 60s maxDuration set in vercel.json).
  */
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Verify cron secret from Vercel (optional but recommended)
@@ -34,8 +35,8 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     const queueDepth = await getQueueDepth();
     console.log(`[Cron] Queue depth: ${queueDepth} events`);
 
-    // Process events in batch (up to 100 per cron run to avoid timeout)
-    const maxEventsPerRun = 100;
+    // Daily run must drain a full day's queue in one pass (60s budget)
+    const maxEventsPerRun = 500;
     let eventCount = 0;
 
     while (eventCount < maxEventsPerRun) {
