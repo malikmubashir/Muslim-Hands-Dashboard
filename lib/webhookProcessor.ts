@@ -9,7 +9,7 @@
  * - Aggregate delta application
  */
 
-import { QueuedEvent } from '../services/webhookQueue';
+import { QueuedEvent } from '../services/webhookQueue.js';
 
 export interface ProcessedEvent {
   event_id: string;

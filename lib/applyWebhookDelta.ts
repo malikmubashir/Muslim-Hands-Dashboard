@@ -5,7 +5,7 @@
  * Uses delta updates instead of full rebuilds for performance
  */
 
-import { ProcessedEvent } from './webhookProcessor';
+import { ProcessedEvent } from './webhookProcessor.js';
 
 export interface AggregateSnapshot {
   // Core metrics

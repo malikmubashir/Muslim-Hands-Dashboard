@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { enqueueWebhookEvent, QueuedEvent } from '../../services/webhookQueue';
+import { enqueueWebhookEvent, QueuedEvent } from '../../services/webhookQueue.js';
 
 interface N3OWebhookPayload {
   [key: string]: any;

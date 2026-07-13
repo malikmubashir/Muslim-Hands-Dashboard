@@ -1,6 +1,39 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { dequeueWebhookEvent, getQueueDepth, markEventProcessed, isEventProcessed } from '../../services/webhookQueue';
-import { processWebhookEvent } from '../../lib/webhookProcessor';
+import { put, list } from '@vercel/blob';
+import {
+  dequeueWebhookEvent,
+  getQueueDepth,
+  markEventProcessed,
+  isEventProcessed,
+  flushProcessedLedger,
+} from '../../services/webhookQueue.js';
+import { processWebhookEvent } from '../../lib/webhookProcessor.js';
+import { applyWebhookDelta, createEmptyAggregate, AggregateSnapshot } from '../../lib/applyWebhookDelta.js';
+
+const AGGREGATE_KEY = 'webhook-queue/aggregates.json';
+
+/** Load the running webhook aggregate snapshot from Blob (or start empty). */
+const loadAggregateSnapshot = async (): Promise<AggregateSnapshot> => {
+  try {
+    const { blobs } = await list({ prefix: AGGREGATE_KEY, limit: 1 });
+    const entry = blobs.find((b) => b.pathname === AGGREGATE_KEY) ?? blobs[0];
+    if (entry) {
+      const res = await fetch(entry.url, { cache: 'no-store' });
+      if (res.ok) return (await res.json()) as AggregateSnapshot;
+    }
+  } catch (error) {
+    console.error('[Cron] Failed to load aggregate snapshot, starting empty:', error);
+  }
+  return createEmptyAggregate();
+};
+
+const saveAggregateSnapshot = async (snapshot: AggregateSnapshot): Promise<void> => {
+  await put(AGGREGATE_KEY, JSON.stringify(snapshot), {
+    access: 'public',
+    contentType: 'application/json',
+    addRandomSuffix: false,
+  });
+};
 
 /**
  * Cron job to process queued webhook events
@@ -18,10 +51,12 @@ import { processWebhookEvent } from '../../lib/webhookProcessor';
  * maxEventsPerRun events, 60s maxDuration set in vercel.json).
  */
 export default async (req: VercelRequest, res: VercelResponse) => {
-  // Verify cron secret from Vercel (optional but recommended)
-  const cronSecret = req.headers.authorization?.replace('Bearer ', '');
-  if (cronSecret && cronSecret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // If CRON_SECRET is configured, REQUIRE a matching Bearer token.
+  // (Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically.)
+  if (process.env.CRON_SECRET) {
+    if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
 
   const startTime = Date.now();
@@ -34,6 +69,9 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // Get queue depth for monitoring
     const queueDepth = await getQueueDepth();
     console.log(`[Cron] Queue depth: ${queueDepth} events`);
+
+    // Load the running aggregate snapshot (persisted across daily runs)
+    let aggregate = await loadAggregateSnapshot();
 
     // Daily run must drain a full day's queue in one pass (60s budget)
     const maxEventsPerRun = 500;
@@ -62,14 +100,9 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         const processedEvent = await processWebhookEvent(queuedEvent);
 
         if (processedEvent.success) {
-          // Mark event as processed
+          // Apply the delta to the running aggregate, then mark processed
+          aggregate = applyWebhookDelta(aggregate, processedEvent);
           await markEventProcessed(queuedEvent.event_id);
-
-          // TODO: Apply processed event to aggregate
-          // - Update donation/donor cube
-          // - Increment affected KPIs
-          // - Refresh dashboard cache
-          // - Broadcast update to WebSocket clients
 
           console.log(`[Cron] Event processed successfully: ${queuedEvent.event_id}`);
           eventsProcessed++;
@@ -92,6 +125,12 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         eventCount++;
       }
     }
+
+    // Persist results once per run (keeps Blob operation counts low)
+    if (eventsProcessed > 0) {
+      await saveAggregateSnapshot(aggregate);
+    }
+    await flushProcessedLedger();
 
     const duration = Date.now() - startTime;
 
