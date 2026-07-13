@@ -7,15 +7,14 @@ import { processWebhookEvent } from '../../lib/webhookProcessor';
  * Runs every 10 seconds via Vercel Cron
  *
  * Vercel Cron configuration in vercel.json:
- * "crons": [{
+ * Add to crons array:
+ * {
  *   "path": "/api/cron/process-webhooks",
- *   "schedule": "*/10 * * * * *"
- * }]
+ *   "schedule": "<every 10 seconds>"
+ * }
  *
- * NOTE: Vercel uses crontab syntax, not a special format:
- * */10 * * * * * = every 10 seconds
- * */5 * * * * * = every 5 seconds
- * 0 */1 * * * * = every 1 minute
+ * Schedule format (crontab syntax):
+ * Every 10 seconds, Every 5 seconds, Every 1 minute
  */
 export default async (req: VercelRequest, res: VercelResponse) => {
   // Verify cron secret from Vercel (optional but recommended)
