@@ -3,8 +3,10 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, Legend,
 } from 'recharts';
-import { Users, Activity, ShieldCheck, Wallet, Download } from 'lucide-react';
+import { Users, UserPlus, Repeat, Coins, ShieldCheck, Download } from 'lucide-react';
 import { DonverseData } from './types';
+import type { DateRange } from './DateRangeBar';
+import type { ExtractionRecord } from '../../services/donverseClient';
 import { KpiCard } from './KpiCard';
 import { DonCard, SectionTitle } from './DonCard';
 import { CategoryDownloadBar } from './CategoryDownloadBar';
@@ -14,19 +16,69 @@ import { fmtEur, fmtNum, fmtPct, MH, PALETTE } from './format';
 
 export const DonorsView: React.FC<{
   data: DonverseData;
+  /** Decrypted gift-level records (warmed after unlock) — enable date-aware KPIs. */
+  records?: ExtractionRecord[] | null;
+  /** Selected date range (shared with the other tabs). */
+  range?: DateRange | null;
   /** Download donors for a segment (full base, all-time). */
   onExtract?: (seed: Partial<ExtractionFilters>) => void;
-}> = ({ data, onExtract }) => {
+}> = ({ data, records, range, onExtract }) => {
   const { t } = useT();
   const d = data.donors;
 
-  const totalActivity = d.byActivity.reduce((s, r) => s + r.count, 0);
-  const actifs = d.byActivity.find((r) => r.name.toLowerCase().startsWith('actif'))?.count ?? 0;
-  const actifPct = totalActivity ? (actifs / totalActivity) * 100 : 0;
-
+  // Snapshot consent rate (fallback while records are still warming).
   const totalConsent = d.byConsent.reduce((s, r) => s + r.count, 0);
   const optIn = d.byConsent.find((r) => r.name === 'Opt-In')?.count ?? 0;
   const optInPct = totalConsent ? (optIn / totalConsent) * 100 : 0;
+
+  // ---- Date-aware KPIs, computed from gift-level records over the selected range ----
+  const period = useMemo(() => {
+    if (!records || records.length === 0 || !range) return null;
+
+    // First-ever gift date per donor (whole base) → identifies NEW donors.
+    const firstGift = new Map<string, string>();
+    for (const r of records) {
+      if (!r.ref || !r.dt) continue;
+      const prev = firstGift.get(r.ref);
+      if (!prev || r.dt < prev) firstGift.set(r.ref, r.dt);
+    }
+
+    // Activity inside the selected range.
+    const active = new Set<string>();
+    let amount = 0;
+    let gifts = 0;
+    let anon = 0;
+    for (const r of records) {
+      if (!r.dt || r.dt < range.start || r.dt > range.end) continue;
+      active.add(r.ref || `__n${anon++}`);
+      amount += r.amt || 0;
+      gifts += 1;
+    }
+
+    // Per-donor attributes among identified period donors.
+    let newDonors = 0;
+    let optInPeriod = 0;
+    const seen = new Set<string>();
+    for (const r of records) {
+      const ref = r.ref;
+      if (!ref || seen.has(ref) || !active.has(ref)) continue;
+      seen.add(ref);
+      const first = firstGift.get(ref);
+      if (first && first >= range.start) newDonors += 1;
+      if (r.pcat === 'Opt-In') optInPeriod += 1;
+    }
+    const returning = Math.max(0, seen.size - newDonors);
+
+    return {
+      donors: active.size,
+      identified: seen.size, // donors with a stable ref (denominator for shares)
+      newDonors,
+      returning,
+      optInPct: seen.size ? (optInPeriod / seen.size) * 100 : 0,
+      amount,
+      gifts,
+    };
+  }, [records, range]);
 
   const topRegions = useMemo(
     () => [...d.byRegion].sort((a, b) => b.count - a.count).slice(0, 10),
@@ -35,12 +87,40 @@ export const DonorsView: React.FC<{
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Users} label={t('dn.totalDonors')} value={fmtNum(d.total)} />
-        <KpiCard icon={Activity} label={t('dn.pctActive')} value={fmtPct(actifPct)} hint={`${fmtNum(actifs)} ${t('dn.activeSuffix')}`} />
-        <KpiCard icon={ShieldCheck} label={t('dn.pctOptIn')} value={fmtPct(optInPct)} hint={t('dn.consentRate')} />
-        <KpiCard icon={Wallet} label={t('dn.totalLtv')} value={fmtEur(d.totalLtv)} hint={t('dn.ltvHint')} />
+      {/* KPIs — follow the selected date range (charts below are full-base snapshots) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <KpiCard
+          icon={Users}
+          label={t('dn.donorsPeriod')}
+          value={fmtNum(period ? period.donors : d.total)}
+          hint={period ? `${fmtNum(d.total)} ${t('dn.baseSuffix')}` : t('dn.wholeBase')}
+        />
+        <KpiCard
+          icon={UserPlus}
+          label={t('dn.newDonors')}
+          value={period ? fmtNum(period.newDonors) : '—'}
+          hint={period && period.identified
+            ? `${fmtPct((period.newDonors / period.identified) * 100)} ${t('dn.ofPeriodDonors')}`
+            : t('dn.needRecords')}
+        />
+        <KpiCard
+          icon={Repeat}
+          label={t('dn.returningDonors')}
+          value={period && period.identified ? fmtPct((period.returning / period.identified) * 100) : '—'}
+          hint={period ? `${fmtNum(period.returning)} ${t('dn.returningHint')}` : t('dn.needRecords')}
+        />
+        <KpiCard
+          icon={Coins}
+          label={t('dn.avgPerDonor')}
+          value={period && period.donors ? fmtEur(period.amount / period.donors) : '—'}
+          hint={period && period.gifts ? `${t('dn.avgGift')} ${fmtEur(period.amount / period.gifts)}` : t('dn.needRecords')}
+        />
+        <KpiCard
+          icon={ShieldCheck}
+          label={t('dn.pctOptIn')}
+          value={fmtPct(period ? period.optInPct : optInPct)}
+          hint={period ? t('dn.consentPeriod') : t('dn.consentRate')}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

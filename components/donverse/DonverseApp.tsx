@@ -328,7 +328,7 @@ const DonverseApp: React.FC = () => {
                   <Info size={14} className="text-blue-500 shrink-0" />
                   {t('dn.snapshotNote')}
                 </div>
-                <DonorsView data={data} onExtract={extractDonors} />
+                <DonorsView data={data} records={records} range={range} onExtract={extractDonors} />
               </>
             )}
           </div>
