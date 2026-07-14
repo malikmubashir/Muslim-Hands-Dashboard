@@ -29,14 +29,67 @@ const OUT_PUBLIC = resolve(REPO, 'public/data/donverse.json'); // static fallbac
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // ---- Resolve source directory ----
+// .xlsx and .csv are both accepted. CSV support exists because very large
+// N3O exports (>500k rows) produce sheet XML beyond Node's max string size,
+// which SheetJS cannot parse — convert those to CSV first (see REFRESH-DATA.md).
 function listXlsx(dir: string): string[] {
   try {
     return readdirSync(dir)
-      .filter((f) => /\.xlsx$/i.test(f) && !f.startsWith('~$'))
+      .filter((f) => /\.(xlsx|csv)$/i.test(f) && !f.startsWith('~$'))
       .map((f) => resolve(dir, f));
   } catch {
     return [];
   }
+}
+
+// ---- Minimal RFC 4180 CSV parser (all cells kept as strings) ----
+// aggregateDonverse coerces types itself (num(), new Date(string) with UTC
+// getters), so string cells are the safest representation: no timezone
+// drift, no accidental serial-number dates.
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function readCsvObjects(file: string): any[] {
+  const rows = parseCsv(readFileSync(file, 'utf8'));
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => String(h).trim());
+  const out: any[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (r.length === 1 && r[0] === '') continue; // trailing blank line
+    const obj: any = {};
+    for (let j = 0; j < headers.length; j++) {
+      const v = r[j];
+      obj[headers[j]] = v === '' || v === undefined ? null : v;
+    }
+    out.push(obj);
+  }
+  return out;
 }
 
 function resolveSourceDir(): string {
@@ -60,6 +113,13 @@ console.log('Source directory:', SRC);
 // ---- Auto-detection by signature columns ----
 function readHeaders(file: string): Set<string> {
   try {
+    if (/\.csv$/i.test(file)) {
+      // Read just the first line — enough for the header row.
+      const head = readFileSync(file, 'utf8').slice(0, 65536);
+      const firstLine = head.split(/\r?\n/, 1)[0] ?? '';
+      const cells = parseCsv(firstLine)[0] ?? [];
+      return new Set(cells.map((h) => String(h).trim()).filter(Boolean));
+    }
     const wb = XLSX.read(readFileSync(file), { sheetRows: 1, dense: true });
     const headers = new Set<string>();
     for (const sn of wb.SheetNames) {
@@ -129,6 +189,9 @@ function detectSources(): { txFile: string; donorFile: string } {
 const { txFile: TX_FILE, donorFile: DONOR_FILE } = detectSources();
 
 function readSheet(file: string, sheetHint: string): any[] {
+  if (/\.csv$/i.test(file)) {
+    return readCsvObjects(file);
+  }
   const buf = readFileSync(file);
   const wb = XLSX.read(buf, { cellDates: true, dense: true });
   const sn = wb.SheetNames.find(s => s.toLowerCase().includes(sheetHint.toLowerCase())) || wb.SheetNames[0];
