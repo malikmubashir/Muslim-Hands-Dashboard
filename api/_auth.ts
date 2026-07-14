@@ -29,11 +29,20 @@ export function readPasswordHeader(req: VercelRequest): string {
 }
 
 /**
- * Returns true iff the request carries the correct team password.
+ * Returns true iff the request carries the correct team password, OR the
+ * internal cron secret as a Bearer token (used by the nightly webhook-merge
+ * job to read the current dataset through /api/data).
  * If `DASHBOARD_PASSWORD` is unset on the server, ALL requests are rejected
  * (fail closed) — we never want to serve donor data with no gate.
  */
 export function isAuthorized(req: VercelRequest): boolean {
+  // Internal service auth (cron → /api/data). Same secret Vercel Cron uses.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && cronSecret.length > 0) {
+    const auth = req.headers.authorization;
+    if (typeof auth === 'string' && safeEqual(auth, `Bearer ${cronSecret}`)) return true;
+  }
+
   const expected = process.env.DASHBOARD_PASSWORD;
   if (!expected || expected.length === 0) return false; // fail closed
   const provided = readPasswordHeader(req);

@@ -1,7 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { put, list } from '@vercel/blob';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   dequeueWebhookEvent,
   getQueueDepth,
@@ -18,31 +16,33 @@ const AGGREGATE_KEY = 'webhook-queue/aggregates.json';
 const DATASET_KEY = 'donverse-latest.json';
 
 /**
- * Load the freshest rendered dataset — same freshness rule as /api/data:
- * uploaded blob vs bundled seed, newest meta.generatedAt wins.
+ * Load the freshest rendered dataset by asking /api/data itself — the single
+ * source of truth for blob-vs-seed freshness. Authenticated with CRON_SECRET
+ * (accepted by api/_auth alongside the team password). This avoids bundling
+ * the 24 MB seed into this function and guarantees both endpoints agree.
  */
 const loadFreshestDataset = async (): Promise<DonverseData | null> => {
-  let seed: DonverseData | null = null;
-  try {
-    seed = JSON.parse(readFileSync(join(__dirname, '..', '_data', 'seed-donverse.json'), 'utf-8'));
-  } catch (error) {
-    console.error('[Cron] Could not read bundled seed:', error);
+  const secret = process.env.CRON_SECRET;
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (!secret || !host) {
+    console.error('[Cron] CRON_SECRET or deployment URL missing — cannot load dataset');
+    return null;
   }
-  let blob: DonverseData | null = null;
   try {
-    const { blobs } = await list({ prefix: DATASET_KEY, limit: 1 });
-    const entry = blobs.find((b) => b.pathname === DATASET_KEY) ?? blobs[0];
-    if (entry) {
-      const res = await fetch(entry.url, { cache: 'no-store' });
-      if (res.ok) blob = (await res.json()) as DonverseData;
+    const res = await fetch(`https://${host}/api/data`, {
+      headers: { authorization: `Bearer ${secret}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      console.error(`[Cron] /api/data returned ${res.status} — cannot load dataset`);
+      return null;
     }
+    const body = await res.json();
+    return (body?.data as DonverseData) ?? null;
   } catch (error) {
-    console.error('[Cron] Could not fetch dataset blob:', error);
+    console.error('[Cron] Failed to load dataset via /api/data:', error);
+    return null;
   }
-  if (blob && seed) {
-    return (blob.meta?.generatedAt ?? '') >= (seed.meta?.generatedAt ?? '') ? blob : seed;
-  }
-  return blob ?? seed;
 };
 
 /** Load the running webhook aggregate snapshot from Blob (or start empty). */
