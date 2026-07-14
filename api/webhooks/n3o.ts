@@ -37,6 +37,14 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // Parse payload
     const payload: N3OWebhookPayload = req.body || {};
 
+    // Strip direct PII before durable storage (queue blobs live on a
+    // public-URL blob store; aggregation never needs names/contact details).
+    const PII_KEYS = ['name', 'firstName', 'lastName', 'email', 'phone', 'telephone', 'address'];
+    for (const k of PII_KEYS) delete payload[k];
+    if (payload.account && typeof payload.account === 'object') {
+      for (const k of PII_KEYS) delete (payload.account as any)[k];
+    }
+
     // Log webhook receipt (for monitoring)
     console.log(`[Webhook] Received event: ${eventType} (ID: ${eventId})`);
 

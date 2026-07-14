@@ -78,26 +78,34 @@ export const applyWebhookDelta = (
     }
 
     else if (eventType === 'donation.created' || eventType === 'donation.updated') {
-      const amount = data.amount || 0;
-      const theme = normalizeTheme(data.theme);
-      const destination = normalizeDestination(data.destination);
+      // One donation may carry several allocation items (validated payload
+      // shape, Jul 2026). Fall back to flat fields for legacy shapes.
+      const items: Array<{ amount?: number; theme?: string; destination?: string }> =
+        Array.isArray(data.items) && data.items.length > 0
+          ? data.items
+          : [{ amount: data.amount || 0, theme: data.theme, destination: data.destination }];
 
-      updated.total_revenue += amount;
       updated.transaction_count += 1;
 
-      // Update theme breakdown
-      if (!updated.themes[theme]) {
-        updated.themes[theme] = { amount: 0, count: 0 };
-      }
-      updated.themes[theme].amount += amount;
-      updated.themes[theme].count += 1;
+      for (const it of items) {
+        const amount = it.amount || 0;
+        const theme = normalizeTheme(it.theme);
+        const destination = normalizeDestination(it.destination);
 
-      // Update destination breakdown
-      if (!updated.destinations[destination]) {
-        updated.destinations[destination] = { amount: 0, count: 0 };
+        updated.total_revenue += amount;
+
+        if (!updated.themes[theme]) {
+          updated.themes[theme] = { amount: 0, count: 0 };
+        }
+        updated.themes[theme].amount += amount;
+        updated.themes[theme].count += 1;
+
+        if (!updated.destinations[destination]) {
+          updated.destinations[destination] = { amount: 0, count: 0 };
+        }
+        updated.destinations[destination].amount += amount;
+        updated.destinations[destination].count += 1;
       }
-      updated.destinations[destination].amount += amount;
-      updated.destinations[destination].count += 1;
     }
 
     else if (eventType === 'pledge.created' || eventType === 'pledge.updated') {
@@ -141,10 +149,11 @@ export const applyWebhookDelta = (
  * Integrates with existing THEME_CANON mapping
  */
 const normalizeTheme = (theme: any): string => {
-  if (!theme) return 'Other';
+  const s = theme == null ? '' : String(theme).trim();
+  if (!s) return 'Other';
 
   // TODO: Integrate with aggregateDonverse.ts THEME_CANON mapping
-  return String(theme).toLowerCase();
+  return s;
 };
 
 /**
@@ -152,10 +161,11 @@ const normalizeTheme = (theme: any): string => {
  * Integrates with existing DEST_MAP mapping
  */
 const normalizeDestination = (destination: any): string => {
-  if (!destination) return 'General';
+  const s = destination == null ? '' : String(destination).trim();
+  if (!s) return 'General';
 
   // TODO: Integrate with aggregateDonverse.ts DEST_MAP mapping
-  return String(destination).toLowerCase();
+  return s;
 };
 
 /**

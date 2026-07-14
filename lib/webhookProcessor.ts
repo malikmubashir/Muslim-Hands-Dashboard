@@ -118,20 +118,42 @@ const processAccountEvent = (payload: any): any => {
 };
 
 /**
- * Transform donation.created/updated event
+ * Transform donation.created/updated event.
+ *
+ * Field mapping validated against LIVE N3O payloads (14 Jul 2026):
+ *   amount       → allocations.items[].value.base.amount (per allocation)
+ *   destination  → allocations.items[].fundDimensions.dimension1
+ *   theme/cause  → allocations.items[].fundDimensions.dimension2
+ *   stipulation  → allocations.items[].fundDimensions.dimension3
+ *   donor ref    → account.reference.text   (e.g. "AC4103536")
+ *   donation ref → reference.text           (e.g. "DN11033200")
+ *   payment      → paymentMethod            (e.g. "Card")
+ *   date         → date                     ("YYYY-MM-DD")
+ * These mirror the xlsx export columns (Fund Dimension 1/2/3, Account Reference).
  */
 const processDonationEvent = (payload: any): any => {
+  const items = (payload?.allocations?.items ?? []).map((it: any) => ({
+    reference: it?.reference ?? '',
+    amount: Number(it?.value?.base?.amount ?? 0),
+    destination: it?.fundDimensions?.dimension1 ?? '',
+    theme: it?.fundDimensions?.dimension2 ?? '',
+    stipulation: it?.fundDimensions?.dimension3 ?? '',
+    fund: it?.fund?.donationItem?.name ?? it?.description ?? '',
+  }));
+  const totalAmount =
+    Number(payload?.allocations?.total?.base?.amount ?? 0) ||
+    items.reduce((s: number, it: any) => s + (it.amount || 0), 0);
+
   return {
-    donation_id: payload.id,
-    account_id: payload.accountId,
-    amount: payload.amount,
-    currency: payload.currency || 'GBP',
-    theme: payload.theme, // Will be normalized via THEME_CANON
-    destination: payload.destination, // Will be normalized via DEST_MAP
-    stipulation: payload.stipulation, // Will be normalized via STIP_MAP
-    created_at: payload.createdAt,
-    updated_at: payload.updatedAt,
-    status: payload.status
+    donation_ref: payload?.reference?.text ?? '',
+    account_ref: payload?.account?.reference?.text ?? '',
+    date: payload?.date ?? '',
+    amount: totalAmount,
+    currency: payload?.currency?.code ?? 'EUR',
+    payment_method: payload?.paymentMethod ?? '',
+    donation_type: payload?.type?.id ?? '',
+    status: payload?.status?.id ?? '',
+    items,
   };
 };
 
