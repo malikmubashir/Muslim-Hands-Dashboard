@@ -26,6 +26,7 @@ export interface QueuedEvent {
 }
 
 const PENDING_PREFIX = 'webhook-queue/pending/';
+const ARCHIVE_PREFIX = 'webhook-queue/archive/';
 const LEDGER_KEY = 'webhook-queue/ledger.json';
 const LEDGER_MAX = 5000; // keep the most recent N processed IDs
 
@@ -88,12 +89,30 @@ export const dequeueWebhookEvent = async (): Promise<QueuedEvent | null> => {
   if (!next) return null;
 
   const res = await fetch(next.url, { cache: 'no-store' });
-  await del(next.url);
   if (!res.ok) {
+    await del(next.url);
     console.error(`[Queue] Unreadable queue blob dropped: ${next.pathname}`);
     return dequeueWebhookEvent();
   }
-  return (await res.json()) as QueuedEvent;
+  const body = await res.text();
+
+  // Archive the raw event before deleting from pending — raw payloads are
+  // needed to validate/fix field mappings in webhookProcessor.ts.
+  const name = next.pathname.startsWith(PENDING_PREFIX)
+    ? next.pathname.slice(PENDING_PREFIX.length)
+    : next.pathname;
+  try {
+    await put(`${ARCHIVE_PREFIX}${name}`, body, {
+      access: 'public',
+      contentType: 'application/json',
+      addRandomSuffix: false,
+    });
+  } catch (error) {
+    console.error('[Queue] Archive write failed (event still processed):', error);
+  }
+
+  await del(next.url);
+  return JSON.parse(body) as QueuedEvent;
 };
 
 /**
