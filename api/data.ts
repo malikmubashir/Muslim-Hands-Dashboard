@@ -17,7 +17,8 @@
 // Vercel once a Blob store is linked to the project).
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { put, list } from '@vercel/blob';
 import { isAuthorized } from './_auth.js';
 
@@ -25,9 +26,13 @@ const BLOB_KEY = 'donverse-latest.json';
 
 /** Read the bundled seed dataset (server-side, NOT publicly served). */
 function readSeed(): any {
-  // __dirname at runtime points at the compiled function location; the seed is
-  // colocated under api/_data and bundled with the function by Vercel.
-  const seedPath = join(__dirname, '_data', 'seed-donverse.json');
+  // The function runs as ESM ("type": "module") where __dirname does not
+  // exist — resolve the module directory ESM-safely, with a CJS fallback.
+  const moduleDir =
+    typeof __dirname !== 'undefined'
+      ? __dirname
+      : dirname(fileURLToPath(import.meta.url));
+  const seedPath = join(moduleDir, '_data', 'seed-donverse.json');
   const raw = readFileSync(seedPath, 'utf-8');
   return JSON.parse(raw);
 }
