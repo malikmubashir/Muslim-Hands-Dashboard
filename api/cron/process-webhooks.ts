@@ -1,5 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { put, list } from '@vercel/blob';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   dequeueWebhookEvent,
   getQueueDepth,
@@ -7,10 +9,41 @@ import {
   isEventProcessed,
   flushProcessedLedger,
 } from '../../services/webhookQueue.js';
-import { processWebhookEvent } from '../../lib/webhookProcessor.js';
+import { processWebhookEvent, ProcessedEvent } from '../../lib/webhookProcessor.js';
 import { applyWebhookDelta, createEmptyAggregate, AggregateSnapshot } from '../../lib/applyWebhookDelta.js';
+import { mergeDonationsIntoDataset } from '../../lib/mergeWebhookIntoDataset.js';
+import type { DonverseData } from '../../components/donverse/types';
 
 const AGGREGATE_KEY = 'webhook-queue/aggregates.json';
+const DATASET_KEY = 'donverse-latest.json';
+
+/**
+ * Load the freshest rendered dataset — same freshness rule as /api/data:
+ * uploaded blob vs bundled seed, newest meta.generatedAt wins.
+ */
+const loadFreshestDataset = async (): Promise<DonverseData | null> => {
+  let seed: DonverseData | null = null;
+  try {
+    seed = JSON.parse(readFileSync(join(__dirname, '..', '_data', 'seed-donverse.json'), 'utf-8'));
+  } catch (error) {
+    console.error('[Cron] Could not read bundled seed:', error);
+  }
+  let blob: DonverseData | null = null;
+  try {
+    const { blobs } = await list({ prefix: DATASET_KEY, limit: 1 });
+    const entry = blobs.find((b) => b.pathname === DATASET_KEY) ?? blobs[0];
+    if (entry) {
+      const res = await fetch(entry.url, { cache: 'no-store' });
+      if (res.ok) blob = (await res.json()) as DonverseData;
+    }
+  } catch (error) {
+    console.error('[Cron] Could not fetch dataset blob:', error);
+  }
+  if (blob && seed) {
+    return (blob.meta?.generatedAt ?? '') >= (seed.meta?.generatedAt ?? '') ? blob : seed;
+  }
+  return blob ?? seed;
+};
 
 /** Load the running webhook aggregate snapshot from Blob (or start empty). */
 const loadAggregateSnapshot = async (): Promise<AggregateSnapshot> => {
@@ -73,6 +106,9 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // Load the running aggregate snapshot (persisted across daily runs)
     let aggregate = await loadAggregateSnapshot();
 
+    // Successful donation events collected for the dataset merge.
+    const successfulEvents: ProcessedEvent[] = [];
+
     // Daily run must drain a full day's queue in one pass (60s budget)
     const maxEventsPerRun = 500;
     let eventCount = 0;
@@ -102,6 +138,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
         if (processedEvent.success) {
           // Apply the delta to the running aggregate, then mark processed
           aggregate = applyWebhookDelta(aggregate, processedEvent);
+          successfulEvents.push(processedEvent);
           await markEventProcessed(queuedEvent.event_id);
 
           console.log(`[Cron] Event processed successfully: ${queuedEvent.event_id}`);
@@ -132,6 +169,26 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     }
     await flushProcessedLedger();
 
+    // ---- Merge the day's donations into the rendered dataset ----
+    let datasetMerge: { merged: number; skipped: number; amount: number } | null = null;
+    if (successfulEvents.length > 0) {
+      const dataset = await loadFreshestDataset();
+      if (dataset) {
+        datasetMerge = mergeDonationsIntoDataset(dataset, successfulEvents);
+        if (datasetMerge.merged > 0) {
+          dataset.meta.generatedAt = new Date().toISOString();
+          await put(DATASET_KEY, JSON.stringify(dataset), {
+            access: 'public',
+            contentType: 'application/json',
+            addRandomSuffix: false,
+          });
+          console.log('[Cron] Dataset updated with webhook donations', datasetMerge);
+        }
+      } else {
+        console.error('[Cron] Dataset unavailable — donations NOT merged (will reconcile on next xlsx refresh)');
+      }
+    }
+
     const duration = Date.now() - startTime;
 
     console.log('[Cron] Webhook processing batch completed', {
@@ -145,6 +202,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
       status: 'success',
       events_processed: eventsProcessed,
       events_failed: eventsFailed,
+      dataset_merge: datasetMerge,
       queue_depth: await getQueueDepth(),
       duration_ms: duration,
       message: 'Webhook batch processing complete'
