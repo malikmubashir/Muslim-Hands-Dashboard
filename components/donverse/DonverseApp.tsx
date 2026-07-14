@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard, Map as MapIcon, Users, Loader2, AlertTriangle,
-  RefreshCw, CheckCircle2, LucideIcon, Info,
+  CheckCircle2, LucideIcon, Info,
 } from 'lucide-react';
 import { DonverseData, DonverseView } from './types';
 import { OverviewView } from './OverviewView';
@@ -243,13 +243,9 @@ const DonverseApp: React.FC = () => {
             <span className="text-xs font-medium text-white bg-white/20 rounded-full px-3 py-1">
               {dataLabel}
             </span>
-            <button
-              onClick={() => setShowUpdate(true)}
-              className="flex items-center gap-1.5 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded-full px-3 py-1.5 transition-colors"
-            >
-              <RefreshCw size={14} />
-              {t('header.update')}
-            </button>
+            {/* "Update data" button removed (14 Jul 2026): data now flows via
+                nightly webhook merge + periodic CLI refresh (REFRESH-DATA.md).
+                Re-enable by restoring the setShowUpdate(true) button here. */}
           </div>
         </div>
 
