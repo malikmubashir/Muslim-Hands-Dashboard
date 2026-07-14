@@ -63,27 +63,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // ---------------------------------------------------------------- GET ----
+  // Freshness wins: serve whichever dataset (browser upload blob vs bundled
+  // seed) has the most recent meta.generatedAt. Prevents a stale blob from
+  // shadowing a newer CLI refresh — and vice versa.
   if (req.method === 'GET') {
+    const seed = readSeed();
+    const seedUpdated = (seed?.meta?.generatedAt as string) || '';
+
     const latest = await findLatestBlob();
     if (latest) {
       try {
         const resp = await fetch(latest.url, { cache: 'no-store' });
         if (resp.ok) {
           const json = await resp.json();
-          const lastUpdated = (json?.meta?.generatedAt as string) || latest.uploadedAt || '';
-          res.setHeader('x-data-source', 'uploaded');
-          res.setHeader('x-data-updated', lastUpdated);
-          return res.status(200).json({ source: 'uploaded', lastUpdated, data: json });
+          const blobUpdated = (json?.meta?.generatedAt as string) || latest.uploadedAt || '';
+          if (!seedUpdated || (blobUpdated && blobUpdated >= seedUpdated)) {
+            res.setHeader('x-data-source', 'uploaded');
+            res.setHeader('x-data-updated', blobUpdated);
+            return res.status(200).json({ source: 'uploaded', lastUpdated: blobUpdated, data: json });
+          }
+          console.log(`[data] Blob (${blobUpdated}) older than seed (${seedUpdated}) — serving seed.`);
         }
       } catch {
         // Fall through to seed if the blob can't be fetched.
       }
     }
-    const seed = readSeed();
-    const lastUpdated = (seed?.meta?.generatedAt as string) || '';
     res.setHeader('x-data-source', 'seed');
-    res.setHeader('x-data-updated', lastUpdated);
-    return res.status(200).json({ source: 'seed', lastUpdated, data: seed });
+    res.setHeader('x-data-updated', seedUpdated);
+    return res.status(200).json({ source: 'seed', lastUpdated: seedUpdated, data: seed });
   }
 
   // --------------------------------------------------------------- POST ----
