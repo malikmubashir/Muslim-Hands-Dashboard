@@ -292,8 +292,8 @@ const DonverseApp: React.FC = () => {
 
         {data && range && (
           <div className="space-y-6">
-            {/* Global date-range control — applies to Tableau de bord, Carte + drill-down */}
-            {hasCube && (view === 'overview' || view === 'map') && (
+            {/* Global date-range control — applies to Tableau de bord, Carte, Donateurs + drill-down */}
+            {hasCube && (view === 'overview' || view === 'map' || view === 'donors') && (
               <DateRangeBar dateMin={dateMin} dateMax={dateMax} range={range} onChange={setRange} />
             )}
 

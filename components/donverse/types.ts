@@ -42,6 +42,18 @@ export interface PostcodeGlobal {
   suppressed: { count: number; value: number };
 }
 
+// ---- PA (Prélèvement Automatique / Direct Debit) monthly dynamics ----
+export interface PaMonthlyRow {
+  month: string;    // "YYYY-MM"
+  started: number;  // donors whose FIRST Direct Debit gift falls in this month
+  stopped: number;  // donors whose Direct Debit lapsed (attributed to the month after their last PA gift)
+}
+export interface PaStats {
+  monthly: PaMonthlyRow[]; // continuous month axis, sorted ascending
+  active: number;          // donors with a PA gift within the final 2 months of the data window
+  stopped: number;         // donors whose PA lapsed before that window
+}
+
 export interface DonverseData {
   meta: {
     generatedAt: string;
@@ -81,6 +93,7 @@ export interface DonverseData {
     byActivity: DonorNameRow[];
     byTier: DonorNameRow[];
     byType: DonorNameRow[];
+    byGenre?: DonorNameRow[]; // Femme / Homme / Couple / Non déterminé (from civility)
     byConsent: DonorNameRow[];
     byDept: DonorDeptRow[];
     byRegion: DonorRegionRow[];
@@ -95,6 +108,7 @@ export interface DonverseData {
   cube?: CubeCell[];                       // one cell per (day, theme) that has data
   regionByDept?: Record<string, string>;   // dept code -> région name
   postcodeGlobal?: PostcodeGlobal;         // FULL period, suppressMinDonors=5 (heatmap)
+  pa?: PaStats;                            // Direct Debit monthly dynamics (Phase 10)
 }
 
 export type DonverseView = 'overview' | 'map' | 'donors' | 'extraction';

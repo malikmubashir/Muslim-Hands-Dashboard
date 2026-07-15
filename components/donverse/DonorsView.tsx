@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
-  PieChart, Pie, Legend,
+  PieChart, Pie, Legend, ComposedChart, Line,
 } from 'recharts';
 import { Users, UserPlus, Repeat, Coins, ShieldCheck, Download } from 'lucide-react';
 import { DonverseData } from './types';
@@ -85,6 +85,30 @@ export const DonorsView: React.FC<{
     [d.byRegion]
   );
 
+  // ---- PA (Direct Debit) monthly dynamics, cumulative computed over the FULL
+  // series then windowed to the selected date range (so the cumulative line
+  // stays correct regardless of the visible window). ----
+  const paSeries = useMemo(() => {
+    const monthly = data.pa?.monthly ?? [];
+    if (monthly.length === 0) return [];
+    let cumul = 0;
+    const full = monthly.map((r) => {
+      cumul += r.started - r.stopped;
+      return { ...r, solde: r.started - r.stopped, cumul };
+    });
+    if (!range) return full;
+    const mStart = range.start.slice(0, 7);
+    const mEnd = range.end.slice(0, 7);
+    return full.filter((r) => r.month >= mStart && r.month <= mEnd);
+  }, [data.pa, range]);
+
+  const GENRE_COLORS: Record<string, string> = {
+    Femme: '#ec4899',
+    Homme: '#3b82f6',
+    Couple: '#7c3aed',
+    'Non déterminé': '#94a3b8',
+  };
+
   return (
     <div className="space-y-6">
       {/* KPIs — follow the selected date range (charts below are full-base snapshots) */}
@@ -122,6 +146,37 @@ export const DonorsView: React.FC<{
           hint={period ? t('dn.consentPeriod') : t('dn.consentRate')}
         />
       </div>
+
+      {/* PA (Direct Debit) monthly dynamics — follows the selected date range */}
+      {paSeries.length > 0 && data.pa && (
+        <DonCard>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <SectionTitle sub={t('dn.paSub')}>{t('dn.paTitle')}</SectionTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2.5 py-1">
+                {t('dn.paActive')} ({fmtNum(data.pa.active)})
+              </span>
+              <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md px-2.5 py-1">
+                {t('dn.paStopped')} ({fmtNum(data.pa.stopped)})
+              </span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={340}>
+            <ComposedChart data={paSeries} margin={{ left: 8, right: 8 }}>
+              <CartesianGrid stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#64748b' }} minTickGap={28} />
+              <YAxis yAxisId="left" tickFormatter={fmtNum} tick={{ fontSize: 11, fill: '#64748b' }} width={48} />
+              <YAxis yAxisId="right" orientation="right" tickFormatter={fmtNum} tick={{ fontSize: 11, fill: '#7c3aed' }} width={52} />
+              <Tooltip formatter={(v: number) => fmtNum(v)} cursor={{ fill: '#f8fafc' }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar yAxisId="left" dataKey="started" name={t('dn.paStarted')} fill={MH.green} radius={[2, 2, 0, 0]} />
+              <Bar yAxisId="left" dataKey="stopped" name={t('dn.paStoppedLegend')} fill="#f4a09c" radius={[2, 2, 0, 0]} />
+              <Line yAxisId="left" type="monotone" dataKey="solde" name={t('dn.paNet')} stroke="#dc2626" strokeDasharray="4 3" strokeWidth={1.5} dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="cumul" name={t('dn.paCumul')} stroke="#7c3aed" strokeWidth={2} dot={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </DonCard>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Activity */}
@@ -164,6 +219,25 @@ export const DonorsView: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Genre donut (Femme / Homme / Couple) */}
+        {d.byGenre && d.byGenre.length > 0 && (
+          <DonCard>
+            <SectionTitle sub={t('dn.genreSub')}>{t('dn.genreTitle')}</SectionTitle>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={d.byGenre} dataKey="count" nameKey="name" innerRadius={55} outerRadius={95} paddingAngle={2}>
+                  {d.byGenre.map((r, i) => (
+                    <Cell key={i} fill={GENRE_COLORS[r.name] ?? PALETTE[i % PALETTE.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => fmtNum(v)} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            {onExtract && <CategoryDownloadBar label={t('dn.dlByGenre')} items={d.byGenre} onPick={(name) => onExtract({ genre: [name] })} />}
+          </DonCard>
+        )}
+
         {/* Type donut */}
         <DonCard>
           <SectionTitle sub={t('dn.typeSub')}>{t('dn.typeTitle')}</SectionTitle>

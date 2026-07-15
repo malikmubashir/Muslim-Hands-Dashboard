@@ -8,7 +8,8 @@
 // import this single module so the published JSON is identical regardless of
 // where it is produced.
 
-import type { DonverseData } from '../components/donverse/types';
+import type { DonverseData, PaMonthlyRow } from '../components/donverse/types';
+import { genreFromTitle } from './buildExtractionData';
 
 export type { DonverseData } from '../components/donverse/types';
 
@@ -284,6 +285,10 @@ export function aggregateDonverseWithExtras(
   const allRefSet = new Set<string>();                  // all distinct donation refs
   const donorRefSet = new Set<string>();                // distinct Account Reference = donors who paid
 
+  // ---- PA (Direct Debit) dynamics: first/last PA gift month per donor ----
+  const paFirst = new Map<string, string>(); // donorRef -> first PA month "YYYY-MM"
+  const paLast = new Map<string, string>();  // donorRef -> last PA month "YYYY-MM"
+
   let txTotalBase = 0;
   let nonFranceTotal = 0;
   let validPostcodeTxValue = 0;
@@ -322,6 +327,14 @@ export function aggregateDonverseWithExtras(
     addSlice(byPayment, payment, amount, { isPA }).isPA = isPA;
     addSlice(byDestination, dest, amount);
     addSlice(byCountry, country, amount);
+
+    // PA dynamics: track each donor's first and last Direct Debit gift month.
+    if (isPA && acctRef && month) {
+      const f = paFirst.get(acctRef);
+      if (!f || month < f) paFirst.set(acctRef, month);
+      const l = paLast.get(acctRef);
+      if (!l || month > l) paLast.set(acctRef, month);
+    }
 
     if (dept && VALID_DEPTS.has(dept)) {
       addSlice(byDept, dept, amount);
@@ -401,6 +414,8 @@ export function aggregateDonverseWithExtras(
 
   const inc = (map: Map<string, number>, key: string) => { map.set(key, (map.get(key) || 0) + 1); };
 
+  const dByGenre = new Map<string, number>();
+
   for (const r of donorRows) {
     donorTotal += 1;
     const ltv = num(r['Total Donation Amount']);
@@ -411,6 +426,7 @@ export function aggregateDonverseWithExtras(
     inc(dByActivity, activityName(maxDate));
     inc(dByTier, tierName(ltv));
     inc(dByType, normSimple(r['Type']));
+    inc(dByGenre, genreFromTitle(r['Title']));
     const consentRaw = (r['RGPD POST IN'] == null ? '' : String(r['RGPD POST IN'])).trim();
     inc(dByConsent, consentRaw === '' ? 'Non renseigné' : consentRaw);
 
@@ -478,10 +494,47 @@ export function aggregateDonverseWithExtras(
   }
   const postcodesSuppressed = suppressedPostcodeSet.size;
 
+  // ================= PA (Direct Debit) DYNAMICS =================
+  // Per donor: started at their FIRST PA gift month; considered ACTIVE if
+  // their LAST PA gift falls within the final 2 months of the data window
+  // (grace period for monthly collection cadence); otherwise counted as
+  // stopped, attributed to the month AFTER their last PA gift.
+  const addMonth = (m: string, n: number): string => {
+    const [y, mo] = m.split('-').map(Number);
+    const t = y * 12 + (mo - 1) + n;
+    return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+  };
+  const incNum = (map: Map<string, number>, key: string) => { map.set(key, (map.get(key) || 0) + 1); };
+
+  const paStartedBy = new Map<string, number>();
+  const paStoppedBy = new Map<string, number>();
+  let paActive = 0;
+  let paStoppedTotal = 0;
+  const paActiveThreshold = monthMax ? addMonth(monthMax, -1) : '';
+  for (const [ref, first] of paFirst.entries()) {
+    const last = paLast.get(ref)!;
+    incNum(paStartedBy, first);
+    if (paActiveThreshold && last >= paActiveThreshold) {
+      paActive += 1;
+    } else {
+      paStoppedTotal += 1;
+      incNum(paStoppedBy, addMonth(last, 1));
+    }
+  }
+  const paMonthly: PaMonthlyRow[] = [];
+  if (paStartedBy.size > 0 && monthMax) {
+    const paFirstMonth = [...paStartedBy.keys()].sort((a, b) => a.localeCompare(b))[0];
+    let guard = 0;
+    for (let m = paFirstMonth; m <= monthMax && guard < 1200; m = addMonth(m, 1), guard++) {
+      paMonthly.push({ month: m, started: paStartedBy.get(m) || 0, stopped: paStoppedBy.get(m) || 0 });
+    }
+  }
+
   // Donor ordered category lists (fixed display order)
   const dByActivityArr = ACT_ORDER.map(name => ({ name, count: dByActivity.get(name) || 0 }));
   const dByTierArr = TIER_ORDER.map(name => ({ name, count: dByTier.get(name) || 0 }));
   const dByTypeArr = [...dByType.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  const dByGenreArr = [...dByGenre.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   const dByConsentArr = [...dByConsent.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   const dByDeptArr = [...dByDept.entries()].map(([code, e]) => ({ code, count: e.count, active: e.active, ltv: round2(e.ltv) }))
     .sort((a, b) => a.code.localeCompare(b.code));
@@ -571,6 +624,7 @@ export function aggregateDonverseWithExtras(
       byActivity: dByActivityArr,
       byTier: dByTierArr,
       byType: dByTypeArr,
+      byGenre: dByGenreArr,
       byConsent: dByConsentArr,
       byDept: dByDeptArr,
       byRegion: dByRegionArr,
@@ -584,6 +638,7 @@ export function aggregateDonverseWithExtras(
     cube,
     regionByDept,
     postcodeGlobal,
+    pa: { monthly: paMonthly, active: paActive, stopped: paStoppedTotal },
   };
 
   return {

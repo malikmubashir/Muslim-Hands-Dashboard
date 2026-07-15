@@ -119,7 +119,7 @@ function rgpdStatus(v: any): 'IN' | 'OUT' {
   const s = (v == null ? '' : String(v)).trim().toLowerCase();
   return IN_VALUES.has(s) ? 'IN' : 'OUT';
 }
-function genreFromTitle(v: any): string {
+export function genreFromTitle(v: any): string {
   const s = (v == null ? '' : String(v)).trim().toLowerCase();
   if (['m. et mme', 'mr et mme', 'couple', 'm. & mme', 'mr & mme'].includes(s)) return 'Couple';
   if (['m.', 'm', 'mr', 'monsieur'].includes(s)) return 'Homme';
