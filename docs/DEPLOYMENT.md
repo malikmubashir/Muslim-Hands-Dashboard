@@ -22,12 +22,21 @@ columns, aggregates via the shared pure module, writes both
 — you want to see **`RECONCILE: PASS`**. It never overwrites anything if it
 can't find both files.
 
-> This CLI path regenerates the **seed only**. It does **not** touch the
-> uploaded Blob or the encrypted extraction blob on a live deployment — those
-> are refreshed by the in-app **Update data** flow (see
-> [`PRIVACY-AND-EXTRACTION.md`](PRIVACY-AND-EXTRACTION.md)). After changing the
-> seed, commit and redeploy; then re-upload in the app if you want the live data
-> and extraction to match.
+> This CLI path regenerates the **seed only**. Since 14 July 2026 the served
+> dataset is whichever of {bundled seed, uploaded blob} has the newest
+> `meta.generatedAt` (`api/data.ts`), so committing + redeploying a fresh seed
+> is sufficient for the dashboard. The nightly webhook merge then overwrites
+> the blob on top of it. The **encrypted extraction blob** (donor contact
+> downloads) is the exception: it is encrypted in the browser with the team
+> password and can only be refreshed via the Update-data modal, whose header
+> button was removed on 14 Jul 2026 (trigger commented out in
+> `components/donverse/DonverseApp.tsx` — restore temporarily if the contact
+> dataset must be refreshed). See
+> [`PRIVACY-AND-EXTRACTION.md`](PRIVACY-AND-EXTRACTION.md).
+>
+> Env vars in production: `DASHBOARD_PASSWORD` (team gate),
+> `BLOB_READ_WRITE_TOKEN` (Blob store), `CRON_SECRET` (Vercel Cron auth; also
+> accepted by `/api/data` as `Bearer` for the nightly merge).
 
 ## Privacy reminders for operators
 

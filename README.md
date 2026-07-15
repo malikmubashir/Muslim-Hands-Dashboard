@@ -1,23 +1,28 @@
 
-## How to update the data
+## How the data stays current
 
-Two ways, both producing the same anonymised aggregate:
+Since 14 July 2026 the dashboard is fed by **two complementary flows**:
 
-- **In the app (recommended for operators).** Click **Update data** in the
-  header, select the two N3O `.xlsx` exports, and confirm. The browser parses,
-  anonymises and uploads the aggregate, and encrypts + uploads the contact
-  dataset — no personal data leaves your browser in plaintext.
+- **Nightly (automatic).** N3O sends webhook events (donations, accounts,
+  pledges, regular/scheduled giving — 11 event types) to
+  `/api/webhooks/n3o`, where they are PII-stripped and durably queued on
+  Vercel Blob. A Vercel Cron drains the queue **daily at 21:00 UTC**
+  (23:00 Paris in summer) and merges the day's donations into the rendered
+  dataset: KPIs, themes, destinations, payments, timeline and the day×theme
+  cube all advance without any human involvement.
+  Details: [`WEBHOOK_AUTOMATION_COMPLETE.md`](WEBHOOK_AUTOMATION_COMPLETE.md).
 
-- **From the command line (for developers).** Drop the two exports into
-  `data-source/` (gitignored) and run:
+- **Monthly (manual, ~15 min).** A CLI refresh from the two N3O list exports
+  (giving LS10385 + donors LS10338) rebuilds the full baseline. This is what
+  updates **geography** (donation webhooks carry no address), **donor
+  attributes** (tiers, activity, consent, gender — no webhook carries
+  cumulative history), the **PA dynamics**, and the encrypted
+  contact-extraction dataset; it also reconciles refunds/amendments — the
+  baseline always wins. Workflow: [`REFRESH-DATA.md`](REFRESH-DATA.md).
 
-  ```bash
-  npm run refresh          # regenerate the seed aggregate
-  npm run refresh:build    # regenerate + production build
-  ```
-
-Full workflow: [`REFRESH-DATA.md`](REFRESH-DATA.md) and
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+> The former in-app **Update data** button was removed on 14 July 2026 so
+> staff cannot trigger ad-hoc uploads; the trigger is commented out in
+> `components/donverse/DonverseApp.tsx` if it ever needs to return.
 
 ## Language
 
@@ -31,10 +36,13 @@ kept verbatim because they double as filter keys for the donor downloads.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — data model, the anonymised
   cube, the aggregation pipeline, geo data.
+- [`WEBHOOK_AUTOMATION_COMPLETE.md`](WEBHOOK_AUTOMATION_COMPLETE.md) — the
+  live webhook pipeline: queue, nightly merge, verified state, known limits.
+- [`REFRESH-DATA.md`](REFRESH-DATA.md) — the monthly baseline refresh,
+  including the large-export (CSV) procedure and sequencing rules.
 - [`docs/PRIVACY-AND-EXTRACTION.md`](docs/PRIVACY-AND-EXTRACTION.md) — the
   PII / encryption / download model.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — Vercel setup, env vars, endpoints,
   operational gotchas.
 - [`docs/N3O-INTEGRATION.md`](docs/N3O-INTEGRATION.md) — for the CRM vendor:
   exact source columns and the path to an automatic feed.
-# Webhook integration complete

@@ -1,16 +1,37 @@
-# Refreshing the dashboard data
+# Refreshing the dashboard data (monthly baseline)
 
-The dashboard reads a single anonymized file: `public/data/donverse.json`.
-That file is generated from two N3O CRM exports. Refreshing is one command.
+The dashboard reads a single anonymized dataset generated from two N3O CRM
+exports. Since 14 July 2026, day-to-day donation figures also flow in
+automatically via the nightly webhook merge (see
+`WEBHOOK_AUTOMATION_COMPLETE.md`) — this manual refresh is the **monthly
+baseline** that updates geography, donor attributes (tiers, activity, consent,
+gender), PA dynamics, the encrypted contact-extraction dataset, and reconciles
+any webhook drift (refunds, amendments). The baseline always wins.
+
+> The in-app **Update data** button was removed on 14 July 2026 — this CLI
+> workflow is now the only refresh path.
+
+## Cadence and sequencing (important)
+
+- **Cadence:** monthly (quarterly at the outside for an audited organization).
+- **Sequence:** do the refresh **in the morning, right after the nightly
+  drain** (the webhook queue is then empty). In N3O, **Refresh** both lists
+  first, then export. A baseline refresh SUPERSEDES prior webhook merges:
+  webhook donations received between list refresh and deploy vanish from
+  display until the next baseline — keeping the window short keeps that gap
+  to minutes.
 
 You do **not** need to rename the exports — the script detects each file by its
 contents, not its filename, and if several match, the newest one wins.
 
 ## Steps
 
-1. **Download the two exports from N3O.**
-   - Open the **giving / transactions** list (**LS10385**) and click **Download** → save the `.xlsx`.
-   - Open the **donor** list (**LS10338**) and click **Download** → save the `.xlsx`.
+1. **Refresh and download the two exports from N3O.**
+   - Open the **giving / transactions** list (**LS10385**), click the
+     **refresh** icon, then **Download List** → Excel → all fields → save.
+   - Open the **donor** list (**LS10338**) and do the same.
+   - Note: the giving list's DATE filter runs to "today" (N3O rejects future
+     end dates) — refreshing the list is what extends it.
 
 2. **Move both files into the project's `data-source/` folder.**
    - You can leave the old files in place or replace them — the script
@@ -26,7 +47,10 @@ contents, not its filename, and if several match, the newest one wins.
    npm run refresh:build
    ```
 
-4. **Done.** The dashboard now reflects the new data. If it is hosted, redeploy.
+4. **Commit and push.** The Vercel deployment ships the new seed, and
+   `/api/data` serves it because it is now the freshest dataset (newest
+   `meta.generatedAt` wins between the bundled seed and the uploaded blob).
+   The next nightly webhook merge builds on top of it automatically.
 
 ## What the script prints
 

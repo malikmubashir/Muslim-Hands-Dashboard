@@ -1,77 +1,93 @@
 # N3O Webhook Integration — Current State
 
-**Status:** ⚙️ CAPTURE + DAILY PROCESSING LIVE — dashboard integration pending
-**Last updated:** 13 July 2026
-**Honest summary:** webhooks are durably captured and processed once daily.
-The main dashboard dataset is still produced by the manual xlsx refresh.
+**Status:** ✅ LIVE END TO END — capture, nightly processing, AND dashboard merge
+**Last updated:** 15 July 2026
+**Summary:** every N3O event is durably captured; once daily the queue is
+drained and the day's donations are merged into the dataset the dashboard
+renders. Geography and donor attributes advance via the monthly xlsx refresh.
 
 ---
 
-## What actually runs in production
+## What runs in production
 
 ```
-N3O Webhook Event
-        ↓ POST /api/webhooks/n3o          (202 Accepted)
+N3O Webhook Event (11 types — see below)
+        ↓ POST /api/webhooks/n3o          202 Accepted; PII stripped
     Durable queue on Vercel Blob          webhook-queue/pending/*.json
         ↓ Vercel Cron — DAILY 21:00 UTC   (23:00 Paris CEST / 22:00 CET,
-          ±1h flexible window on Hobby)    manual "Run" possible in Vercel UI
+          ±1h flexible window on Hobby)    manual "Run" in Vercel UI works too
     Batch drain (≤500 events, 60s)        idempotency ledger webhook-queue/ledger.json
-        ↓ Transform + delta
-    Aggregate snapshot on Blob            webhook-queue/aggregates.json
+        ↓ Transform (validated mappings)   raw payloads archived to webhook-queue/archive/
+    ┌─ Diagnostic snapshot                webhook-queue/aggregates.json
+    └─ MERGE into rendered dataset        donverse-latest.json  ← what the dashboard shows
 ```
 
-Verified end to end on 13 Jul 2026: synthetic event → 202 → queued →
-cron 200 → `events_processed: 1, events_failed: 0, queue_depth: 0`.
+Verified live 14 Jul 2026: synthetic + real donations → queue → drain →
+`donverse-latest.json` updated (KPIs, themes, destinations, timeline, cube).
+
+### Subscribed N3O events (11/51 — deliberately minimal)
+
+`account.created/updated`, `donation.created/updated`, `pledge.created/updated`,
+`regularGiving.created/updated`, `scheduledGiving.created/updated`,
+`fundStructure.updated`. Configured in N3O → Admin → Data → Webhooks (WH1017).
+The other 40 event types are irrelevant to dashboard aggregates.
 
 ### Components
 
 | Piece | File | State |
 |---|---|---|
-| Webhook receiver | `api/webhooks/n3o.ts` | ✅ live, queues to Blob |
-| Durable queue + ledger | `services/webhookQueue.ts` | ✅ live (Vercel Blob) |
+| Webhook receiver (PII strip) | `api/webhooks/n3o.ts` | ✅ live |
+| Durable queue + ledger + archive | `services/webhookQueue.ts` | ✅ live (Vercel Blob) |
 | Daily cron drain | `api/cron/process-webhooks.ts` | ✅ live, `CRON_SECRET` enforced |
-| Event transform | `lib/webhookProcessor.ts` | ✅ runs; field mapping unvalidated against real payloads |
-| Delta application | `lib/applyWebhookDelta.ts` | ✅ runs; writes `AggregateSnapshot` blob |
+| Event transform | `lib/webhookProcessor.ts` | ✅ mappings validated against live payloads (14 Jul) |
+| Dataset merge | `lib/mergeWebhookIntoDataset.ts` | ✅ live — donation.created only |
+| Diagnostic delta snapshot | `lib/applyWebhookDelta.ts` | ✅ live (parallel, not rendered) |
+| Dataset freshness rule | `api/data.ts` | ✅ newest of {uploaded blob, bundled seed} wins |
 | Cron schedule | `vercel.json` → `0 21 * * *` | ✅ registered (Hobby: max 1/day) |
 
-## What does NOT happen (yet)
+### Validated N3O donation payload mapping
 
-- **The dashboard does not read the webhook aggregate.** The UI renders
-  `donverse-latest.json` (`meta / tx / donors`), built by `npm run refresh`
-  from the two N3O xlsx exports (see `REFRESH-DATA.md`). The webhook
-  snapshot (`webhook-queue/aggregates.json`) is a separate, parallel
-  aggregate that nothing in the frontend consumes.
-- **Field mappings are unvalidated.** `webhookProcessor.ts` assumes payload
-  shapes (`amount`, `theme`, `destination`, …) that have not been checked
-  against real N3O webhook payloads. Theme/destination normalization is not
-  yet aligned with `THEME_CANON` / `DEST_MAP` in `aggregateDonverse.ts`.
-- **No retry queue.** Failed events are counted and logged, not re-queued.
+```
+amount       → allocations.items[].value.base.amount   (per allocation)
+destination  → allocations.items[].fundDimensions.dimension1
+theme/cause  → allocations.items[].fundDimensions.dimension2
+stipulation  → allocations.items[].fundDimensions.dimension3
+donor ref    → account.reference.text                  ("AC…")
+donation ref → reference.text                          ("DN…")
+payment      → paymentMethod · date → date ("YYYY-MM-DD")
+```
 
-## Plan to close the gap
+## What the nightly merge does NOT update
 
-1. Let real N3O events accumulate for a few days (they are now captured,
-   nothing is lost).
-2. Inspect actual payloads; validate/fix the mappings in
-   `lib/webhookProcessor.ts`; align normalization with the xlsx pipeline.
-3. Decide the integration model: either map webhook events into
-   `donverse-latest.json` (tx-grain, anonymized, donor dedup) or surface the
-   webhook aggregate as a "since last refresh" delta band in the UI.
-4. Reconcile a week of webhook-derived totals against an xlsx refresh before
-   trusting them.
+- **Geography** (map, dept/region/postcode): donation payloads carry no
+  address. Planned: retain postal code (only) from `account.*` events once
+  archived samples validate the shape.
+- **Donor attributes** (tiers, activity, consent, gender, PA dynamics):
+  computed from the donor list export — no webhook carries cumulative history.
+- **Refunds / amendments**: `donation.updated` is captured but deliberately
+  NOT merged (double-count risk); the monthly refresh reconciles.
+
+## Operating rules
+
+1. **Monthly baseline refresh** (see `REFRESH-DATA.md`): refresh both N3O
+   lists, export, CLI refresh, deploy. This trues up everything above.
+2. **Sequencing:** do the refresh in the morning, right after the nightly
+   drain (queue empty). A baseline refresh SUPERSEDES prior webhook merges —
+   webhook donations received between export generation and the refresh
+   deploy disappear from display until the next refresh. Keep the window
+   short; the next refresh always restores ground truth.
+3. **Manual drain:** Vercel → Project → Settings → Cron Jobs → **Run**.
+4. **Logs:** Vercel → Project → Logs (filter `cron` or `/api/webhooks/n3o`).
+   Hobby retains ~1h of runtime logs — the Blob queue is the durable record.
+5. **Queue inspection:** Vercel → Storage → Blob → `webhook-queue/`.
 
 ## Constraints to remember
 
-- **Vercel Hobby:** crons max once daily (±1h window); Pro floor is once per
-  minute. The original every-10-seconds design was never possible on Vercel.
-- **ESM:** `package.json` has `"type": "module"` — serverless imports need
-  explicit `.js` extensions or functions crash at runtime
-  (`ERR_MODULE_NOT_FOUND`). This bug hid the placeholder implementation:
-  the endpoints had never executed before 13 Jul 2026.
-- **Ops budget:** Blob operations are capped on Hobby; the queue batches
-  reads/writes (1 list + 1 ledger write per run) to stay well inside limits.
-
-## Operations
-
-- Manual drain: Vercel → Project → Settings → Cron Jobs → **Run**.
-- Logs: Vercel → Project → Logs, filter `cron` or `/api/webhooks/n3o`.
-- Queue inspection: Vercel → Storage → Blob → `webhook-queue/`.
+- **Vercel Hobby:** crons max once daily (±1h window); Pro floor is 1/min.
+- **ESM:** `"type": "module"` — serverless imports need explicit `.js`
+  extensions and `__dirname` does not exist at runtime (use
+  `fileURLToPath(import.meta.url)`); both bugs bit us on 14 Jul.
+- **Blob ops budget:** queue batches reads/writes (1 list + 1 ledger write
+  per run) to stay inside Hobby limits.
+- **Auth:** `/api/data` accepts the team password header OR
+  `Bearer $CRON_SECRET` (used by the cron to read the dataset).

@@ -1,7 +1,13 @@
 # N3O Webhook Deployment Checklist
 
-**Timeline:** 2–3 hours  
-**Team:** DevOps, Backend Lead  
+> ⚠️ **SUPERSEDED (15 Jul 2026).** Deployment happened on 13–14 Jul 2026 with
+> a different architecture than planned here (Blob queue instead of KV, daily
+> cron instead of 10-second). Current state and operating rules:
+> [`../WEBHOOK_AUTOMATION_COMPLETE.md`](../WEBHOOK_AUTOMATION_COMPLETE.md).
+> Kept for historical reference only.
+
+**Timeline:** 2–3 hours
+**Team:** DevOps, Backend Lead
 **Risk Level:** Low (fully reversible)
 
 ---

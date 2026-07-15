@@ -1,8 +1,15 @@
 # N3O Webhook Integration Guide
 
-**Status:** ✅ Backend automation complete  
-**Date:** July 2026  
-**Architecture:** Event-driven real-time sync
+> ⚠️ **SUPERSEDED (15 Jul 2026).** This document describes the original
+> design (Vercel KV queue, 10-second cron) which was never deployable on the
+> Hobby plan. The implemented system — Blob-backed queue, daily 21:00 UTC
+> drain, nightly merge into the rendered dataset — is documented in
+> [`../WEBHOOK_AUTOMATION_COMPLETE.md`](../WEBHOOK_AUTOMATION_COMPLETE.md).
+> Kept for historical reference only.
+
+**Status:** ❌ superseded — see banner above
+**Date:** July 2026
+**Architecture:** Event-driven real-time sync (original proposal)
 
 ---
 
