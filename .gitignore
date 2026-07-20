@@ -36,3 +36,4 @@ public/data/extraction-dev.json
 
 # Local backups of retired source files
 *.bak
+.env*
