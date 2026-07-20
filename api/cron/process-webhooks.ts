@@ -172,21 +172,31 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // ---- Merge the day's donations into the rendered dataset ----
     let datasetMerge: { merged: number; skipped: number; amount: number } | null = null;
     if (successfulEvents.length > 0) {
+      console.log(`[Cron] Starting dataset merge with ${successfulEvents.length} successful events`);
       const dataset = await loadFreshestDataset();
+      console.log(`[Cron] loadFreshestDataset returned: ${dataset ? 'dataset found' : 'null'}`);
       if (dataset) {
+        console.log('[Cron] Calling mergeDonationsIntoDataset...');
         datasetMerge = mergeDonationsIntoDataset(dataset, successfulEvents);
+        console.log(`[Cron] mergeDonationsIntoDataset result:`, datasetMerge);
         if (datasetMerge.merged > 0) {
+          console.log('[Cron] Merged donations found, updating dataset timestamp and saving...');
           dataset.meta.generatedAt = new Date().toISOString();
+          console.log('[Cron] About to call put() to save dataset...');
           await put(DATASET_KEY, JSON.stringify(dataset), {
             access: 'public',
             contentType: 'application/json',
             addRandomSuffix: false,
           });
-          console.log('[Cron] Dataset updated with webhook donations', datasetMerge);
+          console.log('[Cron] Dataset saved successfully', datasetMerge);
+        } else {
+          console.log('[Cron] No donations merged (merged count = 0)');
         }
       } else {
         console.error('[Cron] Dataset unavailable — donations NOT merged (will reconcile on next xlsx refresh)');
       }
+    } else {
+      console.log('[Cron] No successful events to merge');
     }
 
     const duration = Date.now() - startTime;
