@@ -109,8 +109,8 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     // Successful donation events collected for the dataset merge.
     const successfulEvents: ProcessedEvent[] = [];
 
-    // Daily run must drain a full day's queue in one pass (60s budget)
-    const maxEventsPerRun = 500;
+    // Runs every minute; process small batch (60s budget, ~3-4 blob ops/event)
+    const maxEventsPerRun = 50;
     let eventCount = 0;
 
     while (eventCount < maxEventsPerRun) {
