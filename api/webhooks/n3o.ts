@@ -21,16 +21,30 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  let eventType: string | undefined;
+  let eventId: string | undefined;
+
   try {
     // Extract event metadata from headers
-    const eventType = req.headers['n3o-event-type'] as string;
-    const eventId = req.headers['n3o-event-id'] as string;
+    eventType = req.headers['n3o-event-type'] as string;
+    eventId = req.headers['n3o-event-id'] as string;
     const subscriptionId = req.headers['n3o-subscription-id'] as string;
+
+    console.log(`[Webhook] Received event: ${eventType} (ID: ${eventId})`);
 
     // Validate required headers
     if (!eventType || !eventId) {
+      console.warn('[Webhook] Missing required headers');
       return res.status(400).json({
         error: 'Missing required headers: n3o-event-type, n3o-event-id'
+      });
+    }
+
+    // Validate BLOB_READ_WRITE_TOKEN exists
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('[Webhook] BLOB_READ_WRITE_TOKEN is not set');
+      return res.status(500).json({
+        error: 'Server misconfiguration: Blob storage not initialized'
       });
     }
 
@@ -45,9 +59,6 @@ export default async (req: VercelRequest, res: VercelResponse) => {
       for (const k of PII_KEYS) delete (payload.account as any)[k];
     }
 
-    // Log webhook receipt (for monitoring)
-    console.log(`[Webhook] Received event: ${eventType} (ID: ${eventId})`);
-
     // Create queued event object
     const queuedEvent: QueuedEvent = {
       event_id: eventId,
@@ -60,6 +71,7 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     };
 
     // Enqueue event for processing
+    console.log('[Webhook] Attempting to enqueue event...');
     await enqueueWebhookEvent(queuedEvent);
     console.log(`[Webhook] Event queued successfully: ${eventId}`);
 
@@ -71,10 +83,14 @@ export default async (req: VercelRequest, res: VercelResponse) => {
     });
 
   } catch (error) {
-    console.error('[Webhook] Error processing event:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`[Webhook] Error processing event ${eventId}:`, errorMsg);
+    console.error('[Webhook] Full error:', error);
+
     return res.status(500).json({
       error: 'Failed to process webhook',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: errorMsg,
+      event_id: eventId
     });
   }
 };
