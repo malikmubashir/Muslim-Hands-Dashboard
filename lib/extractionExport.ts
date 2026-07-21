@@ -11,6 +11,15 @@
 import * as XLSX from 'xlsx-js-style';
 import type { ExtractionRecord } from './buildExtractionData';
 
+// ---- Generosity tiers (labels/thresholds MUST match lib/aggregateDonverse.ts) ----
+export const TIER_ORDER = ['Kind (<500)', 'Engaged (500-1.5k)', 'Generous (1.5-5k)', 'Major (≥5k)'];
+export function tierName(total: number): string {
+  if (total >= 5000) return 'Major (≥5k)';
+  if (total >= 1500) return 'Generous (1.5-5k)';
+  if (total >= 500) return 'Engaged (500-1.5k)';
+  return 'Kind (<500)';
+}
+
 // ---- Slice descriptor: a subset of gift/donor criteria, AND-combined. ----
 export interface ExtractionFilters {
   stip: string[];       // stipulation
@@ -286,6 +295,32 @@ export function downloadDonorsForSlice(
   range: { start: string; end: string },
   opts?: { allTime?: boolean },
 ): number {
+  // ---- Period-aware tier slice ----
+  // A palier download with an active date range must classify donors by what
+  // they gave WITHIN the range (not lifetime): date-scope the gifts, drop the
+  // lifetime-tier filter, dedupe, then re-tier each donor on their period total.
+  const isPalier = !!(seed.palier && seed.palier.length);
+  const hasRange = !!(range.start || range.end);
+  if (isPalier && hasRange && !opts?.allTime) {
+    const filters: ExtractionFilters = {
+      ...EMPTY_FILTERS,
+      ...seed,
+      palier: [], // lifetime tier attribute must NOT pre-filter
+      dateFrom: range.start,
+      dateTo: range.end,
+    };
+    const gifts = records.filter((r) => matchesGift(r, filters));
+    const donors = dedupeDonors(gifts).filter((d) =>
+      seed.palier!.includes(tierName(d.selAmount))
+    );
+    // The Palier column in the export reflects the PERIOD tier.
+    for (const d of donors) d.tier = tierName(d.selAmount);
+    if (!donors.length) return 0;
+    const label = sliceLabel(seed);
+    triggerXlsxDownload(buildDonorWorkbook(donors, label, range), label);
+    return donors.length;
+  }
+
   const filters: ExtractionFilters = {
     ...EMPTY_FILTERS,
     ...seed,

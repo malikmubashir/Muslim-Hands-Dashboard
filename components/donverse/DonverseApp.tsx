@@ -78,6 +78,8 @@ const DonverseApp: React.FC = () => {
 
   // Donateurs-tab downloads: donor-attribute slices over the FULL base, NOT
   // date-scoped (the tab is a snapshot). Includes giftless donors.
+  // EXCEPTION — palier (generosity tier): tiers are period-aware. With a date
+  // range selected, donors are re-tiered on what they gave within the range.
   const extractDonors = useCallback(async (seed: Partial<ExtractionFilters>) => {
     if (exporting) return;
     setExporting(true);
@@ -91,7 +93,10 @@ const DonverseApp: React.FC = () => {
       if (!recs.length) {
         setToast(t('toast.noContacts'));
       } else {
-        const n = downloadDonorsForSlice(recs, seed, { start: '', end: '' }, { allTime: true });
+        const isPalier = !!(seed.palier && seed.palier.length);
+        const n = isPalier && range
+          ? downloadDonorsForSlice(recs, seed, range)
+          : downloadDonorsForSlice(recs, seed, { start: '', end: '' }, { allTime: true });
         setToast(n > 0 ? `${n.toLocaleString(lang === 'en' ? 'en-US' : 'fr-FR')} ${t('toast.downloaded')}` : t('toast.noneSelection'));
       }
     } catch {
@@ -100,7 +105,7 @@ const DonverseApp: React.FC = () => {
       setExporting(false);
       setTimeout(() => setToast(null), 4000);
     }
-  }, [exporting, records]);
+  }, [exporting, records, range]);
 
   // Distinct donors who gave within the selected period (date-aware KPI).
   const donorsInPeriod = useMemo(() => {

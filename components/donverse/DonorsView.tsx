@@ -10,7 +10,7 @@ import type { ExtractionRecord } from '../../services/donverseClient';
 import { KpiCard } from './KpiCard';
 import { DonCard, SectionTitle } from './DonCard';
 import { CategoryDownloadBar } from './CategoryDownloadBar';
-import type { ExtractionFilters } from '../../lib/extractionExport';
+import { tierName, TIER_ORDER, type ExtractionFilters } from '../../lib/extractionExport';
 import { useT } from './i18n';
 import { fmtEur, fmtNum, fmtPct, MH, PALETTE } from './format';
 
@@ -79,6 +79,26 @@ export const DonorsView: React.FC<{
       gifts,
     };
   }, [records, range]);
+
+  // ---- Period-aware generosity tiers: classify each donor on what they gave
+  // WITHIN the selected range (not lifetime). Falls back to the full-base
+  // snapshot while records are still warming or no range is set. ----
+  const periodTiers = useMemo(() => {
+    if (!records || records.length === 0 || !range) return null;
+    const totals = new Map<string, number>();
+    for (const r of records) {
+      if (!r.ref || !r.dt || r.dt < range.start || r.dt > range.end) continue;
+      totals.set(r.ref, (totals.get(r.ref) || 0) + (r.amt || 0));
+    }
+    const counts = new Map<string, number>();
+    for (const total of totals.values()) {
+      const name = tierName(total);
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return TIER_ORDER.map((name) => ({ name, count: counts.get(name) || 0 }));
+  }, [records, range]);
+
+  const tierData = periodTiers ?? d.byTier;
 
   const topRegions = useMemo(
     () => [...d.byRegion].sort((a, b) => b.count - a.count).slice(0, 10),
@@ -198,23 +218,27 @@ export const DonorsView: React.FC<{
           {onExtract && <CategoryDownloadBar label={t('dn.dlByActivity')} items={d.byActivity} onPick={(name) => onExtract({ activite: [name] })} />}
         </DonCard>
 
-        {/* Tier */}
+        {/* Tier — period-aware when records are warmed and a range is set */}
         <DonCard>
-          <SectionTitle sub={t('dn.tierSub')}>{t('dn.tierTitle')}</SectionTitle>
+          <SectionTitle
+            sub={periodTiers && range ? `${range.start} → ${range.end}` : t('dn.tierSub')}
+          >
+            {t('dn.tierTitle')}
+          </SectionTitle>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={d.byTier} margin={{ left: 8, right: 16 }}>
+            <BarChart data={tierData} margin={{ left: 8, right: 16 }}>
               <CartesianGrid stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} interval={0} angle={-15} textAnchor="end" height={56} />
               <YAxis tickFormatter={fmtNum} tick={{ fontSize: 11, fill: '#64748b' }} width={56} />
               <Tooltip formatter={(v: number) => fmtNum(v)} cursor={{ fill: '#f8fafc' }} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {d.byTier.map((_, i) => (
+                {tierData.map((_, i) => (
                   <Cell key={i} fill={[MH.greenLight, MH.greenMid, MH.green, MH.greenDark][i % 4]} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          {onExtract && <CategoryDownloadBar label={t('dn.dlByTier')} items={d.byTier} onPick={(name) => onExtract({ palier: [name] })} />}
+          {onExtract && <CategoryDownloadBar label={t('dn.dlByTier')} items={tierData} onPick={(name) => onExtract({ palier: [name] })} />}
         </DonCard>
       </div>
 
