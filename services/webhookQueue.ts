@@ -50,6 +50,20 @@ let pendingCache: { url: string; pathname: string }[] | null = null;
 let ledgerCache: Set<string> | null = null;
 let ledgerDirty = false;
 
+/**
+ * Reset the invocation caches. MUST be called at the start of every cron run.
+ *
+ * Why: these module-scope caches survive across invocations on a warm lambda.
+ * With the every-minute cron, the instance stays warm — once pendingCache is
+ * drained to [], subsequent runs would see "no events" forever and new events
+ * would pile up unseen until the next cold start.
+ */
+export const resetQueueCaches = (): void => {
+  pendingCache = null;
+  ledgerCache = null;
+  ledgerDirty = false;
+};
+
 const loadPending = async (): Promise<{ url: string; pathname: string }[]> => {
   if (pendingCache === null) {
     const { blobs } = await list({ prefix: PENDING_PREFIX, limit: 1000 });

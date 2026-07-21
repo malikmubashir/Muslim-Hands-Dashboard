@@ -6,6 +6,7 @@ import {
   markEventProcessed,
   isEventProcessed,
   flushProcessedLedger,
+  resetQueueCaches,
 } from '../../services/webhookQueue.js';
 import { processWebhookEvent, ProcessedEvent } from '../../lib/webhookProcessor.js';
 import { applyWebhookDelta, createEmptyAggregate, AggregateSnapshot } from '../../lib/applyWebhookDelta.js';
@@ -98,6 +99,9 @@ export default async (req: VercelRequest, res: VercelResponse) => {
 
   try {
     console.log('[Cron] Starting webhook processing batch');
+
+    // Warm-lambda fix: force a fresh Blob listing + ledger read every run.
+    resetQueueCaches();
 
     // Get queue depth for monitoring
     const queueDepth = await getQueueDepth();
